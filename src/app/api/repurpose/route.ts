@@ -5,110 +5,134 @@ import { verifyToken, extractBearerToken } from "@/lib/auth";
 
 const UNAUTHENTICATED_LIMIT = 10;
 const AUTHENTICATED_LIMIT = 50;
-const AI_MODEL = "opc/deepseek-v4-flash-free";
 
-async function streamFreeTheAi(prompt: string): Promise<ReadableStream<Uint8Array>> {
+const MODELS = [
+  { id: "bbl/gemini-3.5-flash", label: "Gemini 3.5 Flash" },
+  { id: "opc/nemotron-3-ultra-free", label: "Nemotron 3 Ultra" },
+  { id: "bbl/gpt-5.5-mini", label: "GPT-5.5 Mini" },
+  { id: "opc/deepseek-v4-flash-free", label: "DeepSeek V4" },
+];
+
+async function streamCompletion(
+  prompt: string,
+  modelId?: string,
+): Promise<ReadableStream<Uint8Array>> {
   const apiKey = process.env.FREETHEAI_KEY || "";
-
   const encoder = new TextEncoder();
 
   if (!apiKey) {
-    const mock = generateMockResponse(prompt);
-    return new ReadableStream({
-      start(controller) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: mock })}\n\n`));
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
-      },
-    });
+    return mockStream(encoder, generateMockResponse(prompt));
   }
 
-  try {
-    const response = await fetch("https://api.freetheai.xyz/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: AI_MODEL,
-        messages: [
-          { role: "system", content: SYSTEM_PROMPT },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 4000,
-        stream: true,
-      }),
-    });
+  const modelsToTry = modelId
+    ? [modelId, ...MODELS.filter((m) => m.id !== modelId).map((m) => m.id)]
+    : MODELS.map((m) => m.id);
 
-    if (!response.ok || !response.body) {
-      const mock = generateMockResponse(prompt);
-      return new ReadableStream({
-        start(controller) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: mock })}\n\n`));
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
+  for (const model of modelsToTry) {
+    try {
+      const response = await fetch(
+        "https://api.freetheai.xyz/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model,
+            messages: [
+              { role: "system", content: SYSTEM_PROMPT },
+              { role: "user", content: prompt },
+            ],
+            temperature: 0.7,
+            max_tokens: 16000,
+            stream: true,
+          }),
         },
-      });
-    }
+      );
 
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
+      if (!response.ok || !response.body) continue;
 
-    return new ReadableStream({
-      async start(controller) {
-        try {
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let firstChunk = true;
 
-            const chunk = decoder.decode(value, { stream: true });
-            const lines = chunk.split("\n");
+      const stream = new ReadableStream({
+        async start(controller) {
+          try {
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
 
-            for (const line of lines) {
-              const trimmed = line.trim();
-              if (!trimmed || !trimmed.startsWith("data: ")) continue;
+              const chunk = decoder.decode(value, { stream: true });
+              const lines = chunk.split("\n");
 
-              const data = trimmed.slice(6);
-              if (data === "[DONE]") {
-                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-                controller.close();
-                return;
-              }
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (!trimmed || !trimmed.startsWith("data: ")) continue;
 
-              try {
-                const parsed = JSON.parse(data);
-                const content = parsed.choices?.[0]?.delta?.content;
-                if (content && typeof content === "string") {
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ content })}\n\n`),
-                  );
+                const data = trimmed.slice(6);
+                if (data === "[DONE]") {
+                  controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                  controller.close();
+                  return;
                 }
-              } catch {
-                // skip malformed JSON lines
+
+                try {
+                  const parsed = JSON.parse(data);
+                  const content = parsed.choices?.[0]?.delta?.content;
+                  if (typeof content === "string" && content.length > 0) {
+                    if (firstChunk) {
+                      controller.enqueue(
+                        encoder.encode(
+                          `data: ${JSON.stringify({ model })}\n\n`,
+                        ),
+                      );
+                      firstChunk = false;
+                    }
+                    controller.enqueue(
+                      encoder.encode(
+                        `data: ${JSON.stringify({ content })}\n\n`,
+                      ),
+                    );
+                  }
+                } catch {
+                  // skip malformed JSON
+                }
               }
             }
-          }
 
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-        } catch {
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-        }
-      },
-    });
-  } catch {
-    const mock = generateMockResponse(prompt);
-    return new ReadableStream({
-      start(controller) {
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: mock })}\n\n`));
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
-      },
-    });
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          } catch {
+            controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+            controller.close();
+          }
+        },
+      });
+
+      return stream;
+    } catch {
+      continue;
+    }
   }
+
+  return mockStream(encoder, generateMockResponse(prompt));
+}
+
+function mockStream(
+  encoder: TextEncoder,
+  content: string,
+): ReadableStream<Uint8Array> {
+  return new ReadableStream({
+    start(controller) {
+      controller.enqueue(
+        encoder.encode(`data: ${JSON.stringify({ content })}\n\n`),
+      );
+      controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+      controller.close();
+    },
+  });
 }
 
 function generateMockResponse(prompt: string): string {
@@ -131,8 +155,8 @@ function generateMockResponse(prompt: string): string {
       `5/ Quick recap:\n\n\u2705 ${keyPoints.mainInsight}\n\u2705 ${keyPoints.solution}\n\nIf this was helpful, repost the first tweet to help others! \ud83d\udd04`,
     ],
     linkedin_story: `I used to struggle with ${keyPoints.topic}.\n\nEvery day, I'd ${keyPoints.commonMistake}.\n\nThen I discovered something that changed everything:\n\n\u2192 ${keyPoints.mainInsight}\n\nHere's what happened next:\n\n\u2022 ${keyPoints.secondaryInsight}\n\u2022 ${keyPoints.solution}\n\u2022 The results spoke for themselves\n\nThe lesson? Stop overcomplicating ${keyPoints.topic}.\n\nStart with what actually works.\n\nWhat's your biggest challenge with ${keyPoints.topic}? Drop it below \ud83d\udc47`,
-    linkedin_listicle: `Stop wasting time on ${keyPoints.topic}.\n\nHere are 5 things that actually work:\n\n1\ufe0f\u20e3 ${keyPoints.mainInsight}\n   \u2192 This alone 3x'd my results\n\n2\ufe0f\u20e3 ${keyPoints.secondaryInsight}\n   \u2192 Most people overlook this completely\n\n3\ufe0f\u20e3 ${keyPoints.solution}\n   \u2192 Simple but incredibly effective\n\n4\ufe0f\u20e3 Focus on consistency over perfection\n   \u2192 Small daily actions compound fast\n\n5\ufe0f\u20e3 Measure what matters, not what's easy\n   \u2192 Track real outcomes, not vanity metrics\n\nSave this for later \u2014 you'll thank me. \ud83d\udd16\n\n# ${keyPoints.topic.replace(/\s+/g, "")} #Growth #Productivity`,
-    instagram_caption: `Stop scrolling \u2014 this might change how you think about ${keyPoints.topic} \ud83d\udc47\n\nHere's the truth nobody tells you:\n\n${keyPoints.mainInsight}\n\nI used to ${keyPoints.commonMistake}.\n\nThen I learned ${keyPoints.solution}.\n\nThe difference was night and day.\n\n\ud83d\udca1 Save this post for later\n\ud83d\udd04 Share with someone who needs this\n\ud83d\udcac Drop a \ud83d\udd25 if you agree\n\n.\n.\n.\n${Array.from({ length: 20 }, (_, i) => `#${keyPoints.topic.split(" ")[i % keyPoints.topic.split(" ").length]?.replace(/[^a-zA-Z]/g, "") || "content"}`).join(" ")}`,
+    linkedin_listicle: `Stop wasting time on ${keyPoints.topic}.\n\nHere are 5 things that actually work:\n\n1\ufe0f\u20e3 ${keyPoints.mainInsight}\n   \u2192 This alone 3x'd my results\n\n2\ufe0f\u20e3 ${keyPoints.secondaryInsight}\n   \u2192 Most people overlook this completely\n\n3\ufe0f\u20e3 ${keyPoints.solution}\n   \u2192 Simple but incredibly effective\n\n4\ufe0f\u20e3 Focus on consistency over perfection\n   \u2192 Small daily actions compound fast\n\n5\ufe0f\u20e3 Measure what matters, not what's easy\n   \u2192 Track real outcomes, not vanity metrics\n\nSave this for later \u2014 you'll thank me. \ud83d\udd16`,
+    instagram_caption: `Stop scrolling \u2014 this might change how you think about ${keyPoints.topic} \ud83d\udc47\n\nHere's the truth nobody tells you:\n\n${keyPoints.mainInsight}\n\nI used to ${keyPoints.commonMistake}.\n\nThen I learned ${keyPoints.solution}.\n\nThe difference was night and day.\n\n\ud83d\udca1 Save this post for later\n\ud83d\udd04 Share with someone who needs this\n\ud83d\udcac Drop a \ud83d\udd25 if you agree`,
     instagram_carousel_titles: [
       `Stop Doing This in ${keyPoints.topic}`,
       `The #1 Mistake Everyone Makes`,
@@ -143,27 +167,25 @@ function generateMockResponse(prompt: string): string {
     tiktok_script: `HOOK: "You've been doing ${keyPoints.topic} all wrong."\n\n[Text overlay: "The ${keyPoints.topic} secret nobody tells you"]\n\n"Here's what most people do: ${keyPoints.commonMistake}"\n\n[Text overlay: "\u274c Wrong approach"]\n\n"But what actually works is: ${keyPoints.solution}"\n\n[Text overlay: "\u2705 Right approach"]\n\n"And here's the crazy part \u2014 ${keyPoints.mainInsight}."\n\n[Text overlay: "\ud83e\udd2f Mind blown"]\n\n"Follow for more ${keyPoints.topic} tips!"\n\n[Text overlay: "Follow \u2192 \ud83d\udd14"]`,
     reddit: {
       title: `PSA: Here's what actually works for ${keyPoints.topic} (after years of trial and error)`,
-      body: `Hey everyone,\n\nI've been dealing with ${keyPoints.topic} for a while now, and I wanted to share what I've learned after making every mistake in the book.\n\n**The problem:**\nMost advice about ${keyPoints.topic} is either too generic or completely wrong. I used to ${keyPoints.commonMistake}.\n\n**What actually worked:**\n\n1. ${keyPoints.mainInsight}\n2. ${keyPoints.secondaryInsight}\n3. ${keyPoints.solution}\n\n**The result:**\nThese changes made a massive difference. Not overnight, but consistently over time.\n\nHope this helps someone who's in the same boat. Happy to answer questions in the comments.`,
+      body: `Hey everyone,\n\nI've been dealing with ${keyPoints.topic} for a while now, and I wanted to share what I've learned.\n\n**The problem:**\nMost advice about ${keyPoints.topic} is either too generic or completely wrong.\n\n**What actually worked:**\n\n1. ${keyPoints.mainInsight}\n2. ${keyPoints.secondaryInsight}\n3. ${keyPoints.solution}\n\n**The result:**\nThese changes made a massive difference.\n\nHope this helps someone who's in the same boat.`,
       subreddits: ["LifeProTips", "selfimprovement", "GetMotivated"],
     },
-    email_digest: `Subject: The ${keyPoints.topic} strategy that actually works\n\nHey there,\n\nQuick one today \u2014 something about ${keyPoints.topic} that I wish I knew sooner:\n\n${keyPoints.mainInsight}\n\nThe short version: ${keyPoints.solution}\n\nIf you only take one thing from this email, let it be this.\n\nTalk soon.`,
-    email_deep_dive: `Subject: I was wrong about ${keyPoints.topic} \u2014 here's what changed everything\n\nHey there,\n\nI need to admit something.\n\nFor the longest time, I was approaching ${keyPoints.topic} completely wrong.\n\nI used to ${keyPoints.commonMistake}.\n\nEvery. Single. Day.\n\nThen I stumbled onto something that changed my entire perspective:\n\n${keyPoints.mainInsight}\n\nHere's the full breakdown:\n\n**Step 1: Understand the foundation**\n${keyPoints.secondaryInsight}\n\n**Step 2: Implement the change**\n${keyPoints.solution}\n\n**Step 3: Measure and iterate**\nTrack your progress weekly, not daily. Consistency beats intensity.\n\nThe results?\nNight and day difference.\n\nIf you're struggling with ${keyPoints.topic}, try this approach and let me know how it goes.\n\nCheers.`,
-    youtube_community: `Quick question for the community \ud83e\udd14\n\nWhat's your biggest challenge with ${keyPoints.topic}?\n\nA) ${keyPoints.commonMistake}\nB) Not knowing where to start\nC) Staying consistent\nD) Something else (tell me below!)\n\nI'm working on some new content and want to make sure I'm covering what actually matters to you.`,
+    email_digest: `Subject: The ${keyPoints.topic} strategy that actually works\n\nHey there,\n\nQuick one today \u2014 something about ${keyPoints.topic} that I wish I knew sooner:\n\n${keyPoints.mainInsight}\n\nThe short version: ${keyPoints.solution}\n\nTalk soon.`,
+    email_deep_dive: `Subject: I was wrong about ${keyPoints.topic} \u2014 here's what changed everything\n\nHey there,\n\nI need to admit something.\n\nFor the longest time, I was approaching ${keyPoints.topic} completely wrong.\n\nThen I stumbled onto something that changed my entire perspective:\n\n${keyPoints.mainInsight}\n\nHere's the full breakdown:\n\n**Step 1:**\n${keyPoints.secondaryInsight}\n\n**Step 2:**\n${keyPoints.solution}\n\n**Step 3:**\nTrack your progress weekly, not daily.\n\nCheers.`,
+    youtube_community: `Quick question for the community \ud83e\udd14\n\nWhat's your biggest challenge with ${keyPoints.topic}?\n\nA) ${keyPoints.commonMistake}\nB) Not knowing where to start\nC) Staying consistent\nD) Something else`,
     content_calendar: [
-      { day: "Monday", platform: "Twitter", post: `Thread about ${keyPoints.mainInsight} \u2014 hook with a controversial take` },
+      { day: "Monday", platform: "Twitter", post: `Thread about ${keyPoints.mainInsight}` },
       { day: "Tuesday", platform: "LinkedIn", post: `Personal story about overcoming ${keyPoints.commonMistake}` },
       { day: "Wednesday", platform: "Instagram", post: `Carousel: 5-step framework for ${keyPoints.topic}` },
-      { day: "Thursday", platform: "TikTok", post: `Quick tip: ${keyPoints.solution} \u2014 trending audio` },
-      { day: "Friday", platform: "Reddit", post: `Helpful post in relevant subreddit about lessons learned` },
+      { day: "Thursday", platform: "TikTok", post: `Quick tip: ${keyPoints.solution}` },
+      { day: "Friday", platform: "Reddit", post: `Helpful post about lessons learned` },
       { day: "Saturday", platform: "Email", post: `Weekly newsletter deep-dive on ${keyPoints.topic}` },
-      { day: "Sunday", platform: "YouTube", post: `Community poll asking audience about their biggest challenge` },
+      { day: "Sunday", platform: "YouTube", post: `Community poll about their biggest challenge` },
     ],
     hashtags: {
       twitter: [keyPoints.topic.replace(/\s+/g, ""), "tips", "growth"],
       linkedin: [keyPoints.topic.replace(/\s+/g, ""), "professionaldevelopment", "career"],
-      instagram: Array.from({ length: 10 }, (_, i) =>
-        ["contentcreator", "digitalmarketing", "growthmindset", "productivity", "success", "motivation", "tips", "learning", "strategy", "business"][i]
-      ),
+      instagram: ["contentcreator", "digitalmarketing", "growthmindset", "productivity", "success", "motivation", "tips", "learning", "strategy", "business"],
     },
   });
 }
@@ -193,7 +215,7 @@ function extractKeyPoints(content: string): {
 
 export async function POST(req: NextRequest) {
   try {
-    const { content, focus, tone } = await req.json();
+    const { content, focus, tone, model } = await req.json();
 
     if (!content || content.length < 50) {
       return Response.json(
@@ -229,7 +251,7 @@ export async function POST(req: NextRequest) {
     }
 
     const userPrompt = buildUserPrompt(content, focus || "", tone || "");
-    const stream = await streamFreeTheAi(userPrompt);
+    const stream = await streamCompletion(userPrompt, model);
 
     return new Response(stream, {
       status: 200,
