@@ -28,9 +28,13 @@ export default function ExpandedDayView({
   const hasImagePrompts = imagePrompts.length > 0;
 
   const handleCopyPost = async () => {
-    await navigator.clipboard.writeText(editingText);
-    setCopiedPost(true);
-    setTimeout(() => setCopiedPost(false), 2000);
+    try {
+      await navigator.clipboard.writeText(editingText);
+      setCopiedPost(true);
+      setTimeout(() => setCopiedPost(false), 2000);
+    } catch {
+      return;
+    }
     if (session && entry.itemId) {
       fetch("/api/copy", {
         method: "POST",
@@ -42,9 +46,13 @@ export default function ExpandedDayView({
 
   const handleCopyPrompt = async () => {
     const allPrompts = imagePrompts.map((p: string, i: number) => `Image ${i + 1}: ${p}`).join("\n\n");
-    await navigator.clipboard.writeText(allPrompts);
-    setCopiedPrompt(true);
-    setTimeout(() => setCopiedPrompt(false), 2000);
+    try {
+      await navigator.clipboard.writeText(allPrompts);
+      setCopiedPrompt(true);
+      setTimeout(() => setCopiedPrompt(false), 2000);
+    } catch {
+      return;
+    }
     if (session && entry.itemId) {
       fetch("/api/copy", {
         method: "POST",

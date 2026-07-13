@@ -8,10 +8,18 @@ import YouTubeInput from "@/components/YouTubeInput";
 import ProcessingStages from "@/components/ProcessingStages";
 import ContentCalendar from "@/components/ContentCalendar";
 import AuthScreen from "@/components/AuthScreen";
+import ModelSelector from "@/components/ModelSelector";
+import { TRIAL_LIMIT } from "@/lib/constants";
+
+interface ModelOption {
+  providerId: string;
+  providerLabel: string;
+  modelId: string;
+  modelLabel: string;
+}
 
 const TIMEZONE_KEY = "link2post_timezone";
 const TRIAL_KEY = "link2post_trials";
-const TRIAL_LIMIT = 2;
 
 function detectTimezone(): string {
   try {
@@ -49,6 +57,31 @@ function getAuthHeaders(session: Session | null): Record<string, string> {
     headers["Authorization"] = `Bearer ${session.access_token}`;
   }
   return headers;
+}
+
+function parseRegeneratedContent(
+  type: "post" | "article",
+  raw: string,
+): LinkedInPost | LinkedInArticle | null {
+  let cleaned = raw.trim();
+  if (cleaned.startsWith("```")) {
+    cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+  }
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (type === "post" && parsed.hook && parsed.body) return parsed as LinkedInPost;
+    if (type === "article" && parsed.title && parsed.body) return parsed as LinkedInArticle;
+  } catch { /* continue */ }
+  const jsonStart = cleaned.indexOf("{");
+  const jsonEnd = cleaned.lastIndexOf("}");
+  if (jsonStart !== -1 && jsonEnd > jsonStart) {
+    try {
+      const parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
+      if (type === "post" && parsed.hook && parsed.body) return parsed as LinkedInPost;
+      if (type === "article" && parsed.title && parsed.body) return parsed as LinkedInArticle;
+    } catch { /* continue */ }
+  }
+  return null;
 }
 
 function calendarResultFromDb(video: Record<string, unknown>, items: Record<string, unknown>[]): LinkedInResult {
@@ -100,6 +133,18 @@ export default function Home() {
   });
   const [showSignupWall, setShowSignupWall] = useState(false);
   const [supabase] = useState(() => getSupabaseBrowser());
+  const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
+  const [selectedModel, setSelectedModel] = useState<{ providerId: string; modelId: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/models")
+      .then((r) => r.json())
+      .then((data) => {
+        setModelOptions(data.options || []);
+        if (data.default) setSelectedModel(data.default);
+      })
+      .catch(() => {});
+  }, []);
 
   const loadActiveCalendar = useCallback(async (sess: Session) => {
     try {
@@ -170,6 +215,9 @@ export default function Home() {
           videoInfo: transcriptData,
           timezone,
           audience: "LinkedIn professionals",
+          provider: selectedModel?.providerId,
+          model: selectedModel?.modelId,
+          stream: false,
         }),
       });
 
@@ -223,11 +271,23 @@ export default function Home() {
       const res = await fetch("/api/regenerate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type, sourceContent: JSON.stringify(item), videoTitle }),
+        body: JSON.stringify({ type, sourceContent: JSON.stringify(item), videoTitle, provider: selectedModel?.providerId, model: selectedModel?.modelId, stream: false }),
       });
       const data = await res.json();
-      if (res.ok && data.result) {
-        setResult(data.result);
+      if (res.ok && data.content) {
+        const rawContent = data.content;
+        const parsed = parseRegeneratedContent(type, rawContent);
+        if (parsed) {
+          const newResult = { ...result };
+          if (type === "post") {
+            newResult.posts = [...result.posts];
+            newResult.posts[index] = parsed as LinkedInPost;
+          } else {
+            newResult.articles = [...result.articles];
+            newResult.articles[index] = parsed as LinkedInArticle;
+          }
+          setResult(newResult);
+        }
       }
     } finally {
       setLoading(false);
@@ -282,6 +342,16 @@ export default function Home() {
             </div>
 
             <YouTubeInput onSubmit={handleGenerate} isLoading={loading} />
+
+            {modelOptions.length > 1 && (
+              <div className="mt-3">
+                <ModelSelector
+                  options={modelOptions}
+                  selected={selectedModel}
+                  onSelect={(providerId, modelId) => setSelectedModel({ providerId, modelId })}
+                />
+              </div>
+            )}
 
             {!session && trialsRemaining > 0 && trialsRemaining < TRIAL_LIMIT && (
               <p className="text-[11px] mt-3" style={{ color: "var(--text-muted)" }}>

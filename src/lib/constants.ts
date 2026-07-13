@@ -1,8 +1,7 @@
-export const MODELS = [
-  { id: "bbl/gemini-3.5-flash", label: "Gemini 3.5 Flash" },
-  { id: "opc/nemotron-3-ultra-free", label: "Nemotron 3 Ultra" },
-  { id: "bbl/gpt-5.5-mini", label: "GPT-5.5 Mini" },
-  { id: "opc/deepseek-v4-flash-free", label: "DeepSeek V4" },
-] as const;
+import { PROVIDERS } from "./providers";
+
+export const MODELS = PROVIDERS[0].models.map((m) => ({ id: m.id, label: m.label }));
 
 export const TRIAL_LIMIT = 2;
+
+export const ALL_PROVIDER_IDS = PROVIDERS.map((p) => p.id);

@@ -1,9 +1,12 @@
 import { NextRequest } from "next/server";
 import { getSubtitles, getVideoDetails } from "youtube-caption-extractor";
+import { checkRateLimit, getRateLimitHeaders } from "@/lib/rate-limit";
+
+const FETCH_TIMEOUT_MS = 10_000;
 
 function extractVideoId(url: string): string | null {
   const patterns = [
-    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/|music\.youtube\.com\/watch\?v=)([a-zA-Z0-9_-]{11})/,
     /^([a-zA-Z0-9_-]{11})$/,
   ];
   for (const pattern of patterns) {
@@ -11,6 +14,62 @@ function extractVideoId(url: string): string | null {
     if (match) return match[1];
   }
   return null;
+}
+
+async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function fetchVideoDetails(videoId: string): Promise<{ title: string; description: string } | null> {
+  try {
+    const details = await getVideoDetails({ videoID: videoId, lang: "en" });
+    if (details?.title) return { title: details.title, description: details.description || "" };
+  } catch { /* continue */ }
+
+  try {
+    const res = await fetchWithTimeout(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.title) return { title: data.title, description: "" };
+    }
+  } catch { /* continue */ }
+
+  try {
+    const res = await fetchWithTimeout(`https://www.youtube.com/watch?v=${videoId}`, {
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+    });
+    if (res.ok) {
+      const html = await res.text();
+      const titleMatch = html.match(/<title>(.*?)<\/title>/);
+      if (titleMatch) {
+        const title = titleMatch[1].replace(" - YouTube", "").trim();
+        if (title && title !== "YouTube") return { title, description: "" };
+      }
+    }
+  } catch { /* continue */ }
+
+  return null;
+}
+
+async function fetchSubtitles(videoId: string): Promise<string> {
+  const langs = ["en", "en-US", "en-GB"];
+
+  for (const lang of langs) {
+    try {
+      const subtitles = await getSubtitles({ videoID: videoId, lang });
+      if (subtitles.length > 0) {
+        return subtitles.map((s) => s.text).join(" ");
+      }
+    } catch { /* try next lang */ }
+  }
+
+  return "";
 }
 
 export async function POST(req: NextRequest) {
@@ -29,11 +88,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const [details, subtitles] = await Promise.all([
-      getVideoDetails({ videoID: videoId, lang: "en" }).catch(() => null),
-      getSubtitles({ videoID: videoId, lang: "en" }).catch(() => []),
-    ]);
+    const rateResult = await checkRateLimit({ plan: "anonymous" });
+    if (!rateResult.allowed) {
+      return Response.json(
+        { error: "Too many requests. Please try again later." },
+        { status: 429, headers: getRateLimitHeaders(rateResult) },
+      );
+    }
 
+    const details = await fetchVideoDetails(videoId);
     if (!details) {
       return Response.json(
         { error: "Could not fetch video details. The video may be private or unavailable." },
@@ -41,9 +104,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const transcript = subtitles.length > 0
-      ? subtitles.map((s) => s.text).join(" ")
-      : "";
+    const transcript = await fetchSubtitles(videoId);
 
     if (!transcript) {
       return Response.json(

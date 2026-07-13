@@ -2,50 +2,51 @@ import { NextRequest } from "next/server";
 import { SYSTEM_PROMPT, buildYouTubePrompt } from "@/lib/prompts";
 import { checkRateLimit, getRateLimitHeaders, recordGeneration } from "@/lib/rate-limit";
 import { verifyToken, extractBearerToken } from "@/lib/auth";
-import { MODELS } from "@/lib/constants";
 import { validateLinkedInResult, type ValidationError } from "@/lib/validate";
+import { resolveProviderAndModel } from "@/lib/providers";
 import type { VideoInfo, LinkedInResult } from "@/lib/types";
 
 async function streamCompletion(
   systemPrompt: string,
   userPrompt: string,
+  providerId?: string,
   modelId?: string,
 ): Promise<ReadableStream<Uint8Array>> {
-  const apiKey = process.env.FREETHEAI_KEY || "";
   const encoder = new TextEncoder();
+  const resolved = resolveProviderAndModel(providerId, modelId);
 
-  if (!apiKey) {
+  if (!resolved) {
     return mockStream(encoder, generateMockLinkedInResponse());
   }
 
-  const modelsToTry = modelId
-    ? [modelId, ...MODELS.filter((m) => m.id !== modelId).map((m) => m.id)]
-    : MODELS.map((m) => m.id);
+  const { provider, model, apiKey } = resolved;
 
-  for (const model of modelsToTry) {
+  const modelsToTry = [model, ...provider.models.filter((m) => m.id !== model).map((m) => m.id)];
+
+  for (const mdl of modelsToTry) {
     try {
-      const response = await fetch(
-        "https://api.freetheai.xyz/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: userPrompt },
-            ],
-            temperature: 0.7,
-            max_tokens: 16000,
-            stream: true,
-          }),
+      const response = await fetch(provider.baseUrl, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          model: mdl,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 16000,
+          stream: true,
+        }),
+      });
 
-      if (!response.ok || !response.body) continue;
+      if (!response.ok || !response.body) {
+        console.error(`Model ${mdl} (${provider.label}) failed: status=${response.status}`);
+        continue;
+      }
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -78,7 +79,7 @@ async function streamCompletion(
                   if (typeof content === "string" && content.length > 0) {
                     if (firstChunk) {
                       controller.enqueue(
-                        encoder.encode(`data: ${JSON.stringify({ model })}\n\n`),
+                        encoder.encode(`data: ${JSON.stringify({ model: mdl, provider: provider.label })}\n\n`),
                       );
                       firstChunk = false;
                     }
@@ -92,7 +93,8 @@ async function streamCompletion(
 
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
-          } catch {
+          } catch (e) {
+            console.error(`Stream error for model ${mdl}:`, e);
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
           }
@@ -145,7 +147,7 @@ function generateMockLinkedInResponse(): string {
     articles: [
       {
         title: "The LinkedIn Algorithm Isn't a Mystery — It's a Mirror",
-        body: "After spending six months analyzing what separates top-performing LinkedIn content from everything else, I realized something uncomfortable: the algorithm isn't hiding your content. It's reflecting it.\n\n[IMAGE PROMPT 1]\n\n## The Signal Problem\n\nMost creators think the algorithm is a gatekeeper. It isn't. It's a distribution engine that amplifies signals. When your post gets 5 engagements in 10 minutes, it shows it to 50 more people. When those 50 generate 15 engagements, it scales further.\n\nThe algorithm doesn't decide if your content is good. Your audience does. The algorithm just decides how many people get to see that judgment.\n\n**The algorithm is an amplifier, not a judge.**\n\n[IMAGE PROMPT 2]\n\n## The Specificity Principle\n\nVague content gets vague engagement. Specific content gets saved, shared, and commented on.\n\nConsider these two approaches:\n\n| Approach | Example | Expected Engagement |\n|----------|---------|---------------------|\n| Generic | \"Here's what I learned about leadership\" | Low |\n| Specific | \"I fired my best performer. Revenue went up 40%.\" | High |\n\nNumbers, dates, names, and exact details make your content feel real rather than generic. The human brain is wired to engage with specifics, not abstractions.\n\n[IMAGE PROMPT 3]\n\n## The Consistency Multiplier\n\nOne viral post won't build your presence. Three posts per week, every week, for six months will.\n\nThe creators winning on LinkedIn aren't more talented — they're more consistent. And consistency compounds.\n\nHere's the framework that works:\n\n1. **Tuesday**: A standalone post with a specific insight\n2. **Wednesday**: Your strongest piece — article or power post\n3. **Thursday**: A post with a practical takeaway\n4. **Friday** (optional): Something lighter, more personal\n\nThat's 3-4 pieces per week. Not 7. Not 1. Just enough to stay visible without burning out.\n\n[IMAGE PROMPT 4]\n\n## The Bottom Line\n\nStop trying to hack the algorithm. Start creating content that earns engagement. The algorithm will do the rest.\n\nSpecificity gets attention. Consistency builds presence. The algorithm amplifies both.",
+        body: "After spending six months analyzing what separates top-performing LinkedIn content from everything else, I realized something uncomfortable: the algorithm isn't hiding your content. It's reflecting it.\n\n[IMAGE PROMPT 1]\n\n## The Signal Problem\n\nMost creators think the algorithm is a gatekeeper. It isn't. It's a distribution engine that amplifies signals. When your post gets 5 engagements in 10 minutes, it shows it to 50 more people. When those 50 generate 15 engagements, it scales further.\n\nThe algorithm doesn't decide if your content is good. Your audience does. The algorithm just decides how many people get to see that judgment.\n\n**The algorithm is an amplifier, not a judge.**\n\n[IMAGE PROMPT 2]\n\n## The Specificity Principle\n\nVague content gets vague engagement. Specific content gets saved, shared, and commented on.\n\nConsider these two approaches:\n\n| Approach | Example | Expected Engagement |\n|----------|---------|---------------------|\n| Generic | \"Here's what I learned about leadership\" | Low |\n| Specific | \"I fired my best performer. Revenue went up 40%.\" | High |\n\nNumbers, dates, names, and exact details make your content feel real rather than generic. The human brain is wired to engage with specifics, not abstractions.\n\n[IMAGE PROMPT 3]\n\n## The Consistency Multiplier\n\nOne viral post won't build your presence. Three posts per week, every week, for six months will.\n\nThe creators winning on LinkedIn aren't more talented — they're more consistent. And consistency compounds.\n\nHere's the framework that works:\n\n1. **Tuesday**: A standalone post with a specific insight\n2. **Wednesday**: Your strongest piece — article or power post\n3. **Thursday**: A post with a practical takeaway\n4. **Friday** (optional): Something lighter, more personal\n\nThat's 3-4 pieces per week. Not 7. Not 1. Just enough to stay visible without burning out.\n\n[IMAGE PROMPT 4]\n\n## The Bottom Line\n\nStop trying to hack the algorithm. Start understanding it. The moment you shift from \"How do I beat the algorithm?\" to \"How do I give the algorithm something worth amplifying?\" — everything changes.\n\nYour content is the signal. The algorithm is just the amplifier.",
         imagePrompts: [
           "A split-screen conceptual image: left side shows a single LinkedIn post with 3 likes (dim, gray tones), right side shows the same post with 300 likes and a cascade of comment icons (bright, warm tones). The dividing line is a subtle upward arrow. Modern infographic style, clean white background, corporate blue accents.",
           "A close-up of a LinkedIn post being written on a laptop, with the cursor hovering over a specific number ($42K → $187K) that glows slightly. The surrounding text is slightly blurred. Warm, focused, editorial photography style with shallow depth of field.",
@@ -207,11 +209,13 @@ Return the complete corrected JSON response now.`;
 
 export async function POST(req: NextRequest) {
   try {
-    const { videoInfo, timezone, audience, model } = await req.json() as {
+    const { videoInfo, timezone, audience, provider: providerId, model: modelId, stream: wantStream } = await req.json() as {
       videoInfo: VideoInfo;
       timezone: string;
       audience?: string;
+      provider?: string;
       model?: string;
+      stream?: boolean;
     };
 
     if (!videoInfo?.transcript || videoInfo.transcript.length < 100) {
@@ -244,10 +248,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const userPrompt = buildYouTubePrompt(videoInfo, timezone, audience);
-    const stream = await streamCompletion(SYSTEM_PROMPT, userPrompt, model);
+    await recordGeneration({ userId, deviceId }).catch(() => {});
 
-    recordGeneration({ userId, deviceId }).catch(() => {});
+    if (wantStream === false) {
+      const { result, validation } = await generateAndValidate(videoInfo, timezone, audience, providerId, modelId);
+      const responseHeaders: Record<string, string> = {
+        "Content-Type": "application/json",
+        ...getRateLimitHeaders(rateResult),
+      };
+      return Response.json({ result, validation }, { status: 200, headers: responseHeaders });
+    }
+
+    const userPrompt = buildYouTubePrompt(videoInfo, timezone, audience);
+    const stream = await streamCompletion(SYSTEM_PROMPT, userPrompt, providerId, modelId);
 
     const responseHeaders: Record<string, string> = {
       "Content-Type": "text/event-stream",
@@ -266,32 +279,27 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/**
- * Server-side validation function that can be used to validate
- * a parsed LinkedInResult before streaming to the client.
- * Exported for use in tests and potential future server-side retry logic.
- */
 export async function generateAndValidate(
   videoInfo: VideoInfo,
   timezone: string,
   audience?: string,
-  model?: string,
+  providerId?: string,
+  modelId?: string,
 ): Promise<{ result: LinkedInResult; validation: ReturnType<typeof validateLinkedInResult> }> {
-  const apiKey = process.env.FREETHEAI_KEY || "";
+  const resolved = resolveProviderAndModel(providerId, modelId);
   const userPrompt = buildYouTubePrompt(videoInfo, timezone, audience);
 
-  if (!apiKey) {
+  if (!resolved) {
     const mockResult = parseAIResponse(generateMockLinkedInResponse())!;
     return { result: mockResult, validation: validateLinkedInResult(mockResult) };
   }
 
-  const modelsToTry = model
-    ? [model, ...MODELS.filter((m) => m.id !== model).map((m) => m.id)]
-    : MODELS.map((m) => m.id);
+  const { provider, model: defaultModel, apiKey } = resolved;
+  const modelsToTry = [defaultModel, ...provider.models.filter((m) => m.id !== defaultModel).map((m) => m.id)];
 
   for (const mdl of modelsToTry) {
     try {
-      const response = await fetch("https://api.freetheai.xyz/v1/chat/completions", {
+      const response = await fetch(provider.baseUrl, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -320,10 +328,9 @@ export async function generateAndValidate(
 
       const validation = validateLinkedInResult(result);
 
-      // If validation fails, retry once with error feedback
       if (!validation.valid) {
         const retryPrompt = buildValidationFeedbackPrompt(userPrompt, validation.errors);
-        const retryResponse = await fetch("https://api.freetheai.xyz/v1/chat/completions", {
+        const retryResponse = await fetch(provider.baseUrl, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${apiKey}`,

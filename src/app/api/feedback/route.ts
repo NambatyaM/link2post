@@ -11,24 +11,41 @@ export async function POST(req: NextRequest) {
 
     const { itemId, feedback } = await req.json() as {
       itemId: string;
-      feedback: "up" | "down";
+      feedback: "up" | "down" | null;
     };
 
-    if (!itemId || !feedback) {
-      return Response.json({ error: "Missing itemId or feedback" }, { status: 400 });
+    if (!itemId) {
+      return Response.json({ error: "Missing itemId" }, { status: 400 });
     }
 
     const supabase = getSupabaseServer();
 
-    const { error } = await supabase
-      .from("calendar_items")
-      .update({ feedback, feedback_at: new Date().toISOString() })
-      .eq("id", itemId)
-      .eq("user_id", user.userId);
+    if (feedback === null) {
+      const { error } = await supabase
+        .from("calendar_items")
+        .update({ feedback: null, feedback_at: null })
+        .eq("id", itemId)
+        .eq("user_id", user.userId);
 
-    if (error) {
-      console.error("Feedback error:", error);
-      return Response.json({ error: "Failed to save feedback" }, { status: 500 });
+      if (error) {
+        console.error("Feedback clear error:", error);
+        return Response.json({ error: "Failed to clear feedback" }, { status: 500 });
+      }
+    } else {
+      if (feedback !== "up" && feedback !== "down") {
+        return Response.json({ error: "Feedback must be 'up', 'down', or null" }, { status: 400 });
+      }
+
+      const { error } = await supabase
+        .from("calendar_items")
+        .update({ feedback, feedback_at: new Date().toISOString() })
+        .eq("id", itemId)
+        .eq("user_id", user.userId);
+
+      if (error) {
+        console.error("Feedback error:", error);
+        return Response.json({ error: "Failed to save feedback" }, { status: 500 });
+      }
     }
 
     return Response.json({ ok: true });

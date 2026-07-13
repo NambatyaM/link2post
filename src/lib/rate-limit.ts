@@ -1,6 +1,6 @@
 import { getSupabaseServer } from "./supabase-server";
+import { TRIAL_LIMIT } from "./constants";
 
-const TRIAL_LIMIT = 2;
 const FREE_LIMIT = 10;
 const STARTER_LIMIT = 50;
 const WINDOW_MS = 3_600_000; // 1 hour
