@@ -21,15 +21,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
-      <head>
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `try{if(localStorage.getItem('link2post_theme')==='light')document.documentElement.classList.add('light')}catch(e){}`,
-          }}
-        />
-      </head>
-      <body className={inter.className} suppressHydrationWarning>{children}</body>
+    <html lang="en">
+      <body className={inter.className}>{children}</body>
     </html>
   );
 }

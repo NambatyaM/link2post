@@ -9,7 +9,7 @@ import ProcessingStages from "@/components/ProcessingStages";
 import ContentCalendar from "@/components/ContentCalendar";
 import AuthScreen from "@/components/AuthScreen";
 import ModelSelector from "@/components/ModelSelector";
-import ThemeToggle from "@/components/ThemeToggle";
+
 import VideosLibrary from "@/components/VideosLibrary";
 import ReferralBanner from "@/components/ReferralBanner";
 import { TRIAL_LIMIT } from "@/lib/constants";
@@ -469,7 +469,6 @@ export default function Home() {
               New content
             </button>
           )}
-          <ThemeToggle />
         </div>
         {appState === "input" && (
           <div className="flex flex-col items-center w-full max-w-[640px]">
