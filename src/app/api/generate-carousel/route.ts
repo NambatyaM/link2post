@@ -12,7 +12,7 @@ function parseCarouselResponse(raw: string): CarouselSlide[] | null {
   }
 
   function sanitize(slides: Record<string, unknown>[]): CarouselSlide[] | null {
-    if (!Array.isArray(slides) || slides.length < 5) return null;
+    if (!Array.isArray(slides) || slides.length < 3) return null;
     return slides.map((s: Record<string, unknown>, i: number) => ({
       slideNumber: (s.slideNumber as number) || i + 1,
       title: String(s.title || "").slice(0, 100),

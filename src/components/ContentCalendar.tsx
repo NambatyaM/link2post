@@ -5,7 +5,7 @@ import { Session } from "@supabase/supabase-js";
 import type { LinkedInResult, CalendarEntry, LinkedInPost, LinkedInArticle, VideoScript, CarouselSlide } from "@/lib/types";
 import ExpandedDayView from "./ExpandedDayView";
 import VideoScriptView from "./VideoScriptView";
-import PDFExporter from "./PDFExporter";
+import CarouselBuilder from "./CarouselBuilder";
 
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
 type Tab = "calendar" | "script" | "carousel";
@@ -241,7 +241,7 @@ export default function ContentCalendar({
       {activeTab === "carousel" && (
         <div>
           {carouselSlides ? (
-            <PDFExporter slides={carouselSlides} videoTitle={videoTitle} />
+            <CarouselBuilder initialSlides={carouselSlides} videoTitle={videoTitle} />
           ) : (
             <div className="text-center py-12">
               <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: "rgba(16,163,127,0.12)" }}>

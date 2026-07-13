@@ -33,14 +33,16 @@ Return ONLY valid JSON with this structure:
   "platformNotes": "Works for Reels, TikTok, YouTube Shorts"
 }`;
 
-export const CAROUSEL_SYSTEM_PROMPT = `You are an expert LinkedIn carousel content strategist. You transform transcripts into 10-slide LinkedIn carousels that get saves, shares, and comments.
+export const CAROUSEL_SYSTEM_PROMPT = `You are an expert LinkedIn carousel content strategist. You transform transcripts into LinkedIn carousels (6-10 slides) that get saves, shares, and comments.
 
 Your carousels are built on SPECIFIC insights from the source material — never generic advice. Each slide teaches ONE thing clearly.
 
 SLIDE RULES:
 1. Slide 1 (Hook): A bold, curiosity-driven title that stops the scroll. Use a number, a contrarian claim, or a sharp question. Body adds context.
-2. Slides 2-9 (Content): One specific takeaway per slide. Title = the key point (max 8 words). Body = the explanation with a concrete example, number, or story from the transcript (max 30 words).
-3. Slide 10 (CTA): A clear call to action — save, follow, share, or comment.
+2. Slides 2-N-1 (Content): One specific takeaway per slide. Title = the key point (max 8 words). Body = the explanation with a concrete example, number, or story from the transcript (max 30 words).
+3. Last slide (CTA): A clear call to action — save, follow, share, or comment.
+
+SLIDE COUNT: Use 6-10 slides depending on how many distinct, strong insights the content provides. Better to have 7 great slides than 10 mediocre ones.
 
 WRITING STYLE:
 - Use short, punchy sentences
@@ -351,7 +353,7 @@ Return the complete JSON response now.`;
 }
 
 export function buildCarouselPrompt(videoInfo: VideoInfo): string {
-  return `CREATE A 10-SLIDE LINKEDIN CAROUSEL FROM THIS CONTENT:
+  return `CREATE A LINKEDIN CAROUSEL FROM THIS CONTENT:
 
 ---TITLE---
 ${videoInfo.title}
@@ -364,12 +366,12 @@ ${videoInfo.transcript.slice(0, 15000)}
 
 ---INSTRUCTIONS---
 
-Extract the 10 most impactful, specific insights from the transcript above. Create a carousel where each slide teaches ONE thing clearly.
+Extract the strongest, most specific insights from the transcript. Create a carousel with 6-10 slides — use as many slides as there are strong, distinct takeaways. Better to have 7 great slides than 10 weak ones.
 
 SLIDE STRUCTURE:
 - Slide 1 (Hook): Bold title that stops the scroll. Use a number, contrarian claim, or sharp question from the transcript.
-- Slides 2-9 (Content): One key takeaway per slide with a concrete example, number, or story.
-- Slide 10 (CTA): Call to action — save, follow, share, or comment.
+- Middle slides: One key takeaway per slide with a concrete example, number, or story.
+- Last slide (CTA): Call to action — save, follow, share, or comment.
 
 QUALITY CHECKLIST:
 - Every slide has a SPECIFIC detail from the transcript (not generic advice)
