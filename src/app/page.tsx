@@ -470,12 +470,8 @@ export default function Home() {
         </div>
         {appState === "input" && (
           <div className="flex flex-col items-center w-full max-w-[640px]">
-            <div className="mb-8 text-center">
-              <div className="w-12 h-12 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: "var(--accent)" }}>
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-                </svg>
-              </div>
+              <div className="mb-4 text-center">
+              <img src="/logo.png" alt="Link2Post" className="w-16 h-16 rounded-2xl mx-auto mb-4 object-cover" />
               <h1 className="text-xl font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
                 What can I help you create?
               </h1>
