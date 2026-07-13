@@ -164,7 +164,7 @@ export default function ContentCalendar({
                 <div
                   className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center"
                   style={{
-                    background: entry.type === "article" ? "rgba(10,102,194,0.12)" : "rgba(16,163,127,0.12)",
+                    background: entry.type === "article" ? "rgba(10,102,194,0.12)" : "rgba(99,102,241,0.12)",
                   }}
                 >
                   <span className="text-[11px] font-semibold" style={{ color: entry.type === "article" ? "#0a66c2" : "var(--accent)" }}>
@@ -221,7 +221,7 @@ export default function ContentCalendar({
             <VideoScriptView script={script} />
           ) : (
             <div className="text-center py-12">
-              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: "rgba(16,163,127,0.12)" }}>
+              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: "rgba(99,102,241,0.12)" }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="5"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
               </div>
               <p className="text-sm font-medium mb-1" style={{ color: "var(--text-primary)" }}>Generate a short video script</p>
@@ -244,7 +244,7 @@ export default function ContentCalendar({
             <CarouselBuilder initialSlides={carouselSlides} videoTitle={videoTitle} />
           ) : (
             <div className="text-center py-12">
-              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: "rgba(16,163,127,0.12)" }}>
+              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: "rgba(99,102,241,0.12)" }}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
               </div>
               <p className="text-sm font-medium mb-1" style={{ color: "var(--text-primary)" }}>Generate a carousel</p>

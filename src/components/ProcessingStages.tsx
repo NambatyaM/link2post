@@ -66,7 +66,7 @@ export default function ProcessingStages({ videoTitle, stage }: { videoTitle?: s
               <div
                 className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all"
                 style={{
-                  background: done ? "rgba(16,163,127,0.12)" : active ? "var(--bg-tertiary)" : "transparent",
+                  background: done ? "rgba(99,102,241,0.12)" : active ? "var(--bg-tertiary)" : "transparent",
                   border: active ? "1.5px solid var(--accent)" : "1.5px solid var(--border-light)",
                 }}
               >

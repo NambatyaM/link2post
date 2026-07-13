@@ -9,7 +9,7 @@ import html2canvas from "html2canvas-pro";
 import { jsPDF } from "jspdf";
 
 const PRESET_COLORS = [
-  "#ffffff", "#10a37f", "#3b82f6", "#f59e0b", "#ef4444",
+  "#ffffff", "#6366f1", "#3b82f6", "#f59e0b", "#ef4444",
   "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#111827",
 ];
 

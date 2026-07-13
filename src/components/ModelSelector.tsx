@@ -100,7 +100,7 @@ export default function ModelSelector({
                   <span
                     className="text-[9px] px-1.5 py-0.5 rounded-md font-medium"
                     style={{
-                      background: "rgba(16,163,127,0.1)",
+                      background: "rgba(99,102,241,0.1)",
                       color: "var(--accent)",
                     }}
                   >
@@ -120,7 +120,7 @@ export default function ModelSelector({
                       }}
                       className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors"
                       style={{
-                        background: isSelected ? "rgba(16,163,127,0.1)" : "transparent",
+                        background: isSelected ? "rgba(99,102,241,0.1)" : "transparent",
                         color: isSelected ? "var(--accent)" : "var(--text-secondary)",
                       }}
                       onMouseEnter={(e) => {

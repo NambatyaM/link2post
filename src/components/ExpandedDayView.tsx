@@ -105,7 +105,7 @@ export default function ExpandedDayView({
           <span
             className="text-[11px] font-medium px-2 py-0.5 rounded-md"
             style={{
-              background: isArticle ? "rgba(10,102,194,0.12)" : "rgba(16,163,127,0.12)",
+              background: isArticle ? "rgba(10,102,194,0.12)" : "rgba(99,102,241,0.12)",
               color: isArticle ? "#0a66c2" : "var(--accent)",
             }}
           >
@@ -175,7 +175,7 @@ export default function ExpandedDayView({
           <button
             onClick={handleCopyPost}
             className="text-xs font-medium px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5"
-            style={{ background: copiedPost ? "rgba(16,163,127,0.12)" : "var(--accent)", color: copiedPost ? "var(--accent)" : "white" }}
+            style={{ background: copiedPost ? "rgba(99,102,241,0.12)" : "var(--accent)", color: copiedPost ? "var(--accent)" : "white" }}
           >
             {copiedPost ? (
               <><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg> Copied!</>
@@ -203,7 +203,7 @@ export default function ExpandedDayView({
               className="p-1.5 rounded-lg transition-colors"
               style={{
                 color: feedback === "up" ? "var(--accent)" : "var(--text-muted)",
-                background: feedback === "up" ? "rgba(16,163,127,0.12)" : "transparent",
+                background: feedback === "up" ? "rgba(99,102,241,0.12)" : "transparent",
               }}
               title="Good output"
             >

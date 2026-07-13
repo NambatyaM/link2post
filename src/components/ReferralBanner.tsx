@@ -63,7 +63,7 @@ export default function ReferralBanner({ session }: { session: Session }) {
           onClick={() => setExpanded(!expanded)}
           className="w-full px-4 py-3 flex items-center gap-3 text-left"
         >
-          <div className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(16,163,127,0.12)" }}>
+          <div className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(99,102,241,0.12)" }}>
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2">
               <path d="M16 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4h2" /><circle cx="8.5" cy="7" r="4" /><line x1="20" y1="8" x2="20" y2="14" /><line x1="23" y1="11" x2="17" y2="11" />
             </svg>

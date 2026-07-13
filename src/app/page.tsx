@@ -469,27 +469,35 @@ export default function Home() {
           <ThemeToggle />
         </div>
         {appState === "input" && (
-          <div className="flex flex-col items-center w-full max-w-[600px]">
-            <div className="mb-6 text-center">
-              <h1 className="text-2xl font-bold mb-1" style={{ color: "var(--text-primary)" }}>
-                Link2Post
+          <div className="flex flex-col items-center w-full max-w-[640px]">
+            <div className="mb-8 text-center">
+              <div className="w-12 h-12 rounded-2xl mx-auto mb-4 flex items-center justify-center" style={{ background: "var(--accent)" }}>
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                </svg>
+              </div>
+              <h1 className="text-xl font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
+                What can I help you create?
               </h1>
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                Paste a transcript, get a week of LinkedIn content.
+                Paste a transcript and get a full week of LinkedIn content.
               </p>
             </div>
 
             <TranscriptInput onSubmit={handleGenerate} isLoading={loading} />
 
-            {modelOptions.length > 1 && (
-              <div className="mt-3">
+            <div className="flex items-center justify-between w-full mt-3 px-1">
+              <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+                Works with any transcript — YouTube, podcasts, interviews, lectures.
+              </p>
+              {modelOptions.length > 1 && (
                 <ModelSelector
                   options={modelOptions}
                   selected={selectedModel}
                   onSelect={(providerId, modelId) => setSelectedModel({ providerId, modelId })}
                 />
-              </div>
-            )}
+              )}
+            </div>
 
             {!session && trialsRemaining > 0 && trialsRemaining < TRIAL_LIMIT && (
               <p className="text-[11px] mt-3" style={{ color: "var(--text-muted)" }}>
@@ -506,51 +514,6 @@ export default function Home() {
             {error && (
               <p className="text-xs mt-3 max-w-[520px] text-center" style={{ color: "#ef4444" }}>{error}</p>
             )}
-
-            <div className="mt-10 w-full">
-              <p className="text-[11px] text-center mb-4" style={{ color: "var(--text-muted)" }}>
-                What you get from one transcript:
-              </p>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { icon: "post", label: "LinkedIn Posts", desc: "Hooks, stories, CTAs" },
-                  { icon: "article", label: "LinkedIn Article", desc: "Long-form with image prompts" },
-                  { icon: "calendar", label: "Content Calendar", desc: "Best times to post" },
-                  { icon: "script", label: "Video Script", desc: "60-sec Reels & TikToks" },
-                  { icon: "carousel", label: "PDF Carousel", desc: "10 slides, download ready" },
-                  { icon: "library", label: "Video Library", desc: "Save & revisit anytime" },
-                ].map((item) => (
-                  <div
-                    key={item.label}
-                    className="rounded-xl px-3 py-4 text-center"
-                    style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border-light)" }}
-                  >
-                    <div className="w-8 h-8 rounded-lg mx-auto mb-2 flex items-center justify-center" style={{ background: "rgba(16,163,127,0.12)" }}>
-                      {item.icon === "post" && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                      )}
-                      {item.icon === "article" && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                      )}
-                      {item.icon === "calendar" && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-                      )}
-                      {item.icon === "script" && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="5"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
-                      )}
-                      {item.icon === "carousel" && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
-                      )}
-                      {item.icon === "library" && (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
-                      )}
-                    </div>
-                    <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>{item.label}</p>
-                    <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>{item.desc}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
         )}
 

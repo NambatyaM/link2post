@@ -106,7 +106,7 @@ export default function VideosLibrary({
 
       {videos.length === 0 ? (
         <div className="text-center py-16">
-          <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: "rgba(16,163,127,0.12)" }}>
+          <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: "rgba(99,102,241,0.12)" }}>
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </div>
           <p className="text-sm font-medium mb-1" style={{ color: "var(--text-primary)" }}>No videos yet</p>

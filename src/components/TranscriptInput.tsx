@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 export default function TranscriptInput({
   onSubmit,
@@ -12,6 +12,14 @@ export default function TranscriptInput({
   const [transcript, setTranscript] = useState("");
   const [title, setTitle] = useState("");
   const [error, setError] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 200)}px`;
+    }
+  }, [transcript]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,58 +36,73 @@ export default function TranscriptInput({
     onSubmit(title.trim() || "Untitled video", trimmed);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e);
+    }
+  };
+
   const charCount = transcript.length;
 
   return (
-    <form onSubmit={handleSubmit} className="w-full max-w-[600px]">
-      <input
-        type="text"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        placeholder="Video title (optional)"
-        className="w-full text-sm px-4 py-3 rounded-xl outline-none mb-3 transition-colors"
+    <form onSubmit={handleSubmit} className="w-full">
+      <div
+        className="rounded-2xl transition-all"
         style={{
-          background: "var(--bg-input)",
-          color: "var(--text-primary)",
-          border: "1px solid var(--border)",
-        }}
-        disabled={isLoading}
-      />
-      <textarea
-        value={transcript}
-        onChange={(e) => { setTranscript(e.target.value); setError(""); }}
-        placeholder={"Paste your YouTube transcript here.\n\nTo get it: open the video on YouTube, click the three dots (⋯) below the video, select \"Show transcript\", copy all the text, and paste it here."}
-        className="w-full text-sm px-4 py-3 rounded-xl outline-none mb-2 transition-colors resize-none"
-        style={{
-          background: "var(--bg-input)",
-          color: "var(--text-primary)",
+          background: "var(--bg-secondary)",
           border: `1px solid ${error ? "#ef4444" : "var(--border)"}`,
-          minHeight: "180px",
+          boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
         }}
-        disabled={isLoading}
-        autoFocus
-      />
-      <div className="flex items-center justify-between mb-3 px-1">
-        <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
-          {charCount > 0 ? `${charCount.toLocaleString()} characters` : ""}
-        </span>
-        {charCount > 0 && charCount < 100 && (
-          <span className="text-[11px]" style={{ color: "#ef4444" }}>
-            Need at least 100 characters
+      >
+        <input
+          type="text"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Title (optional)"
+          className="w-full text-sm px-4 pt-3 pb-0 outline-none bg-transparent"
+          style={{ color: "var(--text-primary)" }}
+          disabled={isLoading}
+        />
+        <textarea
+          ref={textareaRef}
+          value={transcript}
+          onChange={(e) => { setTranscript(e.target.value); setError(""); }}
+          placeholder="Paste your transcript here..."
+          className="w-full text-sm px-4 py-2 outline-none resize-none bg-transparent"
+          style={{
+            color: "var(--text-primary)",
+            minHeight: "48px",
+            maxHeight: "200px",
+          }}
+          rows={1}
+          disabled={isLoading}
+          autoFocus
+          onKeyDown={handleKeyDown}
+        />
+        <div className="flex items-center justify-between px-4 pb-2">
+          <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>
+            {charCount > 0 ? `${charCount.toLocaleString()} chars` : ""}
           </span>
-        )}
+          <button
+            type="submit"
+            disabled={isLoading || !transcript.trim()}
+            className="p-1.5 rounded-lg transition-colors disabled:opacity-30"
+            style={{
+              background: transcript.trim() ? "var(--accent)" : "var(--bg-tertiary)",
+              color: transcript.trim() ? "white" : "var(--text-muted)",
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13" />
+              <polygon points="22 2 15 22 11 13 2 9 22 2" />
+            </svg>
+          </button>
+        </div>
       </div>
       {error && (
-        <p className="text-xs mb-3 px-1" style={{ color: "#ef4444" }}>{error}</p>
+        <p className="text-xs mt-2 px-1" style={{ color: "#ef4444" }}>{error}</p>
       )}
-      <button
-        type="submit"
-        disabled={isLoading || !transcript.trim()}
-        className="w-full text-sm font-medium py-3.5 rounded-xl transition-colors disabled:opacity-30"
-        style={{ background: "var(--accent)", color: "white" }}
-      >
-        Generate this week&apos;s content
-      </button>
     </form>
   );
 }

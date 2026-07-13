@@ -37,7 +37,7 @@ function SlideRenderer({ slide, slideRef }: { slide: CarouselSlide; slideRef?: R
           left: "40px",
           fontSize: "14px",
           fontWeight: 600,
-          color: "#10a37f",
+          color: "#6366f1",
           letterSpacing: "0.05em",
           textTransform: "uppercase",
         }}
@@ -90,7 +90,7 @@ function SlideRenderer({ slide, slideRef }: { slide: CarouselSlide; slideRef?: R
           style={{
             marginTop: "40px",
             padding: "16px 32px",
-            background: "#10a37f",
+            background: "#6366f1",
             borderRadius: "12px",
             fontSize: "20px",
             fontWeight: 600,
@@ -108,7 +108,7 @@ function SlideRenderer({ slide, slideRef }: { slide: CarouselSlide; slideRef?: R
           left: "40px",
           right: "40px",
           height: "3px",
-          background: `linear-gradient(to right, #10a37f ${(slide.slideNumber / 10) * 100}%, rgba(255,255,255,0.1) ${(slide.slideNumber / 10) * 100}%)`,
+          background: `linear-gradient(to right, #6366f1 ${(slide.slideNumber / 10) * 100}%, rgba(255,255,255,0.1) ${(slide.slideNumber / 10) * 100}%)`,
           borderRadius: "2px",
         }}
       />
