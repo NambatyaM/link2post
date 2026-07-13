@@ -514,6 +514,24 @@ export default function Home() {
             {error && (
               <p className="text-xs mt-3 max-w-[520px] text-center" style={{ color: "#ef4444" }}>{error}</p>
             )}
+
+            <div className="mt-16 w-full grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {[
+                { label: "LinkedIn Posts", desc: "Hooks, stories, CTAs" },
+                { label: "Long-form Article", desc: "With image prompts" },
+                { label: "Content Calendar", desc: "Best times to post" },
+                { label: "Video Script", desc: "60-sec Reels & TikToks" },
+              ].map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-xl px-4 py-3"
+                  style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border-light)" }}
+                >
+                  <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>{item.label}</p>
+                  <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>{item.desc}</p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 
