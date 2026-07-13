@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   title: "Link2Post — Paste a transcript, get a week of LinkedIn content",
   description:
     "Paste any transcript and get LinkedIn posts, articles, carousels, video scripts, and a content calendar — ready to publish.",
-  icons: { icon: "/favicon.svg" },
+  icons: { icon: "/logo.png" },
 };
 
 export default function RootLayout({

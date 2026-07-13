@@ -457,7 +457,7 @@ export default function Home() {
               className="text-xs px-3 py-1.5 rounded-lg transition-colors"
               style={{ border: "1px solid var(--border)", color: "var(--text-muted)" }}
             >
-              My Videos
+              My content
             </button>
           )}
           {appState === "library" && (
@@ -466,7 +466,7 @@ export default function Home() {
               className="text-xs px-3 py-1.5 rounded-lg transition-colors"
               style={{ border: "1px solid var(--border)", color: "var(--text-muted)" }}
             >
-              New video
+              New content
             </button>
           )}
           <ThemeToggle />
@@ -476,10 +476,10 @@ export default function Home() {
               <div className="mb-4 text-center">
               <img src="/logo.png" alt="Link2Post" className="w-16 h-16 rounded-2xl mx-auto mb-4 object-cover" />
               <h1 className="text-xl font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
-                What can I help you create?
+                Turn any transcript into LinkedIn content
               </h1>
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                Paste a transcript and get a full week of LinkedIn content.
+                Paste your transcript. Get posts, articles, carousels, and a content calendar — ready to publish.
               </p>
             </div>
 

@@ -97,7 +97,7 @@ export default function ContentCalendar({
             className="text-xs px-3 py-1.5 rounded-lg transition-colors"
             style={{ background: "var(--accent)", color: "white" }}
           >
-            New video
+            New content
           </button>
         </div>
       </div>

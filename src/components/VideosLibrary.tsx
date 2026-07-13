@@ -100,7 +100,7 @@ export default function VideosLibrary({
           className="text-xs font-medium px-4 py-2 rounded-lg transition-colors"
           style={{ background: "var(--accent)", color: "white" }}
         >
-          New video
+          New content
         </button>
       </div>
 
@@ -110,7 +110,7 @@ export default function VideosLibrary({
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
           </div>
           <p className="text-sm font-medium mb-1" style={{ color: "var(--text-primary)" }}>No videos yet</p>
-          <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>Paste a YouTube link to get started</p>
+          <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>Paste a transcript to get started</p>
           <button
             onClick={onNewVideo}
             className="text-xs font-medium px-4 py-2 rounded-lg transition-colors"

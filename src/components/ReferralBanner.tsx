@@ -107,7 +107,7 @@ export default function ReferralBanner({ session }: { session: Session }) {
                 </div>
                 <div className="flex gap-2">
                   <a
-                    href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out Link2Post — it turns YouTube videos into LinkedIn content in seconds. Use my referral link for free generations:`)}&url=${encodeURIComponent(`${window.location.origin}?ref=${stats.code}`)}`}
+                    href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`Check out Link2Post — it turns transcripts into LinkedIn content in seconds. Use my referral link for free generations:`)}&url=${encodeURIComponent(`${window.location.origin}?ref=${stats.code}`)}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex-1 text-center text-[11px] font-medium py-2 rounded-lg transition-colors"
