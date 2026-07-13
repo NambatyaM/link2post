@@ -1,32 +1,7 @@
-import { SignJWT, jwtVerify } from "jose";
+import { getSupabaseServer } from "./supabase-server";
 
-const SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || "contentrep-dev-secret-change-in-production",
-);
-
-export interface TokenPayload {
-  deviceId: string;
-  plan: "free" | "pro";
-}
-
-export async function signToken(payload: TokenPayload): Promise<string> {
-  return new SignJWT({ ...payload })
-    .setProtectedHeader({ alg: "HS256" })
-    .setIssuedAt()
-    .setExpirationTime("30d")
-    .sign(SECRET);
-}
-
-export async function verifyToken(token: string): Promise<TokenPayload | null> {
-  try {
-    const { payload } = await jwtVerify(token, SECRET);
-    return {
-      deviceId: payload.deviceId as string,
-      plan: (payload.plan as "free" | "pro") || "free",
-    };
-  } catch {
-    return null;
-  }
+export interface AuthUser {
+  userId: string;
 }
 
 export function extractBearerToken(request: Request): string | null {
@@ -34,4 +9,15 @@ export function extractBearerToken(request: Request): string | null {
   if (!auth) return null;
   const match = auth.match(/^Bearer\s+(.+)$/i);
   return match ? match[1] : null;
+}
+
+export async function verifyToken(token: string): Promise<AuthUser | null> {
+  try {
+    const supabase = getSupabaseServer();
+    const { data, error } = await supabase.auth.getUser(token);
+    if (error || !data.user) return null;
+    return { userId: data.user.id };
+  } catch {
+    return null;
+  }
 }

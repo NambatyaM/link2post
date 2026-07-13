@@ -9,9 +9,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Content Repurposer AI — One Post, 8 Platforms, 30 Seconds",
+  title: "Link2Post — Turn any YouTube video into a week of LinkedIn content",
   description:
-    "Paste your blog post, article, or any long-form content and get platform-optimized posts for Twitter, LinkedIn, Instagram, TikTok, Reddit, Email, and YouTube in one click.",
+    "Paste a YouTube link and get a full week of LinkedIn posts, articles, and image prompts — ready to copy and publish.",
 };
 
 export default function RootLayout({

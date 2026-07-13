@@ -1,80 +1,134 @@
-interface RateLimitEntry {
-  timestamps: number[];
-}
+import { getSupabaseServer } from "./supabase-server";
 
-const store = new Map<string, RateLimitEntry>();
+const TRIAL_LIMIT = 2;
+const FREE_LIMIT = 10;
+const STARTER_LIMIT = 50;
+const WINDOW_MS = 3_600_000; // 1 hour
 
-const CLEANUP_INTERVAL = 60_000;
-let lastCleanup = Date.now();
-
-function cleanup(now: number) {
-  if (now - lastCleanup < CLEANUP_INTERVAL) return;
-  lastCleanup = now;
-  for (const [key, entry] of store) {
-    entry.timestamps = entry.timestamps.filter((t) => now - t < 3_600_000);
-    if (entry.timestamps.length === 0) store.delete(key);
-  }
-}
-
-export interface RateLimitConfig {
-  windowMs: number;
-  max: number;
-}
-
-const DEFAULT_CONFIG: RateLimitConfig = {
-  windowMs: 3_600_000,
-  max: 10,
-};
+export type Plan = "anonymous" | "free" | "starter" | "pro";
 
 export interface RateLimitResult {
   allowed: boolean;
   remaining: number;
   retryAfterMs: number;
+  limit: number;
+  plan: Plan;
 }
 
-export function checkRateLimit(
-  key: string,
-  config: RateLimitConfig = DEFAULT_CONFIG,
-): RateLimitResult {
-  const now = Date.now();
-  cleanup(now);
+function getLimitForPlan(plan: Plan): number {
+  switch (plan) {
+    case "anonymous": return TRIAL_LIMIT;
+    case "free": return FREE_LIMIT;
+    case "starter": return STARTER_LIMIT;
+    case "pro": return Infinity;
+  }
+}
 
-  let entry = store.get(key);
-  if (!entry) {
-    entry = { timestamps: [] };
-    store.set(key, entry);
+export async function checkRateLimit(opts: {
+  userId?: string;
+  deviceId?: string;
+  plan?: Plan;
+}): Promise<RateLimitResult> {
+  const { userId, deviceId, plan = "anonymous" } = opts;
+  const supabase = getSupabaseServer();
+
+  if (plan === "pro") {
+    return { allowed: true, remaining: Infinity, retryAfterMs: 0, limit: Infinity, plan };
   }
 
-  entry.timestamps = entry.timestamps.filter((t) => now - t < config.windowMs);
+  const limit = getLimitForPlan(plan);
+  const windowStart = new Date(Date.now() - WINDOW_MS).toISOString();
 
-  if (entry.timestamps.length >= config.max) {
-    const oldest = entry.timestamps[0];
-    const retryAfterMs = config.windowMs - (now - oldest);
-    return { allowed: false, remaining: 0, retryAfterMs: Math.max(retryAfterMs, 1000) };
+  if (userId) {
+    const { count } = await supabase
+      .from("rate_limits")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .gte("created_at", windowStart);
+
+    const used = count ?? 0;
+    if (used >= limit) {
+      const { data: oldest } = await supabase
+        .from("rate_limits")
+        .select("created_at")
+        .eq("user_id", userId)
+        .gte("created_at", windowStart)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .single();
+
+      const retryAfterMs = oldest
+        ? Math.max(WINDOW_MS - (Date.now() - new Date(oldest.created_at).getTime()), 1000)
+        : WINDOW_MS;
+
+      return { allowed: false, remaining: 0, retryAfterMs, limit, plan };
+    }
+
+    await supabase.from("rate_limits").insert({ user_id: userId });
+    return { allowed: true, remaining: limit - used - 1, retryAfterMs: 0, limit, plan };
   }
 
-  entry.timestamps.push(now);
-  return {
-    allowed: true,
-    remaining: config.max - entry.timestamps.length,
-    retryAfterMs: 0,
-  };
+  if (deviceId) {
+    const { count } = await supabase
+      .from("generations")
+      .select("*", { count: "exact", head: true })
+      .eq("device_id", deviceId)
+      .gte("created_at", windowStart);
+
+    const used = count ?? 0;
+    if (used >= limit) {
+      const { data: oldest } = await supabase
+        .from("generations")
+        .select("created_at")
+        .eq("device_id", deviceId)
+        .gte("created_at", windowStart)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .single();
+
+      const retryAfterMs = oldest
+        ? Math.max(WINDOW_MS - (Date.now() - new Date(oldest.created_at).getTime()), 1000)
+        : WINDOW_MS;
+
+      return { allowed: false, remaining: 0, retryAfterMs, limit, plan };
+    }
+
+    return { allowed: true, remaining: limit - used - 1, retryAfterMs: 0, limit, plan };
+  }
+
+  return { allowed: true, remaining: limit, retryAfterMs: 0, limit, plan };
+}
+
+export async function recordGeneration(opts: {
+  userId?: string;
+  deviceId?: string;
+  fingerprint?: string;
+}): Promise<void> {
+  const supabase = getSupabaseServer();
+  await supabase.from("generations").insert({
+    user_id: opts.userId || null,
+    device_id: opts.deviceId || null,
+    fingerprint: opts.fingerprint || null,
+  });
+}
+
+export async function linkDeviceToUser(deviceId: string, userId: string): Promise<void> {
+  const supabase = getSupabaseServer();
+  await supabase
+    .from("generations")
+    .update({ user_id: userId })
+    .eq("device_id", deviceId)
+    .is("user_id", null);
 }
 
 export function getRateLimitHeaders(result: RateLimitResult): Record<string, string> {
   const headers: Record<string, string> = {
-    "X-RateLimit-Remaining": String(result.remaining),
+    "X-RateLimit-Remaining": String(result.remaining === Infinity ? 999 : result.remaining),
+    "X-RateLimit-Limit": String(result.limit === Infinity ? 999 : result.limit),
+    "X-RateLimit-Plan": result.plan,
   };
   if (!result.allowed) {
     headers["Retry-After"] = String(Math.ceil(result.retryAfterMs / 1000));
   }
   return headers;
-}
-
-export function getClientIp(request: Request): string {
-  const xff = request.headers.get("x-forwarded-for");
-  if (xff) return xff.split(",")[0].trim();
-  const realIp = request.headers.get("x-real-ip");
-  if (realIp) return realIp.trim();
-  return "127.0.0.1";
 }

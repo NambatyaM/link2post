@@ -8,10 +8,8 @@ const config = {
   setupFilesAfterEnv: ["<rootDir>/jest.setup.ts"],
   moduleNameMapper: {
     "^@/(.*)$": "<rootDir>/src/$1",
-    "^jose$": "<rootDir>/__mocks__/jose.js",
   },
-  testPathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/node_modules/"],
-  transformIgnorePatterns: ["node_modules/(?!(jose)/)"],
+  testPathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/.vercel/", "<rootDir>/node_modules/"],
 };
 
 module.exports = createJestConfig(config);
