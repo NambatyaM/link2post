@@ -267,13 +267,27 @@ export default function Home() {
     abortRef.current = false;
 
     try {
-      const transcriptRes = await fetch("/api/transcript", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-      const transcriptData = await transcriptRes.json();
-      if (!transcriptRes.ok) throw new Error(transcriptData.error || "Failed to fetch transcript");
+      let transcriptData: { title: string; description: string; transcript: string; url: string; videoId: string };
+
+      // Try client-side extraction first (works from browser's residential IP)
+      try {
+        const { fetchTranscriptClient } = await import("@/lib/transcript-client");
+        transcriptData = await fetchTranscriptClient(url);
+      } catch {
+        // Fall back to server-side (may work for some videos)
+        const transcriptRes = await fetch("/api/transcript", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url }),
+        });
+        const serverData = await transcriptRes.json();
+        if (!transcriptRes.ok) throw new Error(serverData.error || "Failed to fetch transcript");
+        transcriptData = serverData;
+      }
+
+      if (!transcriptData.transcript || transcriptData.transcript.length < 50) {
+        throw new Error("Could not extract a usable transcript. The video may not have captions.");
+      }
       if (abortRef.current) return;
 
       setVideoTitle(transcriptData.title || "YouTube video");

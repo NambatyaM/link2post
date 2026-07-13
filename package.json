@@ -12,6 +12,7 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@distube/ytdl-core": "^4.16.12",
     "@supabase/supabase-js": "^2.110.2",
     "html2canvas-pro": "^2.2.4",
     "jspdf": "^4.2.1",
