@@ -17,6 +17,23 @@
   --scrollbar-thumb: #565656;
 }
 
+.light {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f7f7f8;
+  --bg-tertiary: #ececec;
+  --bg-input: #ffffff;
+  --bg-hover: #f0f0f0;
+  --bg-user-msg: #f7f7f8;
+  --accent: #10a37f;
+  --accent-hover: #0e8c6b;
+  --text-primary: #171717;
+  --text-secondary: #525252;
+  --text-muted: #a3a3a3;
+  --border: #e5e5e5;
+  --border-light: #f0f0f0;
+  --scrollbar-thumb: #d4d4d4;
+}
+
 * {
   box-sizing: border-box;
 }
