@@ -6,6 +6,7 @@ export interface ProviderModel {
 export interface Provider {
   id: string;
   label: string;
+  tagline: string;
   baseUrl: string;
   envKey: string;
   models: ProviderModel[];
@@ -13,20 +14,9 @@ export interface Provider {
 
 export const PROVIDERS: Provider[] = [
   {
-    id: "freetheai",
-    label: "FreeTheAI",
-    baseUrl: "https://api.freetheai.xyz/v1/chat/completions",
-    envKey: "FREETHEAI_KEY",
-    models: [
-      { id: "bbl/gemini-3.5-flash", label: "Gemini 3.5 Flash" },
-      { id: "opc/nemotron-3-ultra-free", label: "Nemotron 3 Ultra" },
-      { id: "bbl/gpt-5.5-mini", label: "GPT-5.5 Mini" },
-      { id: "opc/deepseek-v4-flash-free", label: "DeepSeek V4" },
-    ],
-  },
-  {
     id: "groq",
     label: "Groq",
+    tagline: "Fastest",
     baseUrl: "https://api.groq.com/openai/v1/chat/completions",
     envKey: "GROQ_API_KEY",
     models: [
@@ -39,6 +29,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "gemini",
     label: "Google Gemini",
+    tagline: "Longest context",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
     envKey: "GEMINI_API_KEY",
     models: [
@@ -50,6 +41,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "openrouter",
     label: "OpenRouter",
+    tagline: "Most models",
     baseUrl: "https://openrouter.ai/api/v1/chat/completions",
     envKey: "OPENROUTER_API_KEY",
     models: [
@@ -62,6 +54,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "cerebras",
     label: "Cerebras",
+    tagline: "Highest volume",
     baseUrl: "https://api.cerebras.ai/v1/chat/completions",
     envKey: "CEREBRAS_API_KEY",
     models: [
@@ -72,6 +65,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "mistral",
     label: "Mistral",
+    tagline: "Best quality",
     baseUrl: "https://api.mistral.ai/v1/chat/completions",
     envKey: "MISTRAL_API_KEY",
     models: [
@@ -81,8 +75,22 @@ export const PROVIDERS: Provider[] = [
     ],
   },
   {
+    id: "freetheai",
+    label: "FreeTheAI",
+    tagline: "Multi-model",
+    baseUrl: "https://api.freetheai.xyz/v1/chat/completions",
+    envKey: "FREETHEAI_KEY",
+    models: [
+      { id: "bbl/gemini-3.5-flash", label: "Gemini 3.5 Flash" },
+      { id: "opc/nemotron-3-ultra-free", label: "Nemotron 3 Ultra" },
+      { id: "bbl/gpt-5.5-mini", label: "GPT-5.5 Mini" },
+      { id: "opc/deepseek-v4-flash-free", label: "DeepSeek V4" },
+    ],
+  },
+  {
     id: "sambanova",
     label: "SambaNova",
+    tagline: "Fast + free",
     baseUrl: "https://api.sambanova.ai/v1/chat/completions",
     envKey: "SAMBANOVA_API_KEY",
     models: [
@@ -93,6 +101,7 @@ export const PROVIDERS: Provider[] = [
   {
     id: "nvidia",
     label: "NVIDIA NIM",
+    tagline: "Enterprise",
     baseUrl: "https://integrate.api.nvidia.com/v1/chat/completions",
     envKey: "NVIDIA_API_KEY",
     models: [

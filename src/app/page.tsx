@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Session } from "@supabase/supabase-js";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import type { LinkedInResult, LinkedInPost, LinkedInArticle } from "@/lib/types";
@@ -9,11 +9,13 @@ import ProcessingStages from "@/components/ProcessingStages";
 import ContentCalendar from "@/components/ContentCalendar";
 import AuthScreen from "@/components/AuthScreen";
 import ModelSelector from "@/components/ModelSelector";
+import ThemeToggle from "@/components/ThemeToggle";
 import { TRIAL_LIMIT } from "@/lib/constants";
 
 interface ModelOption {
   providerId: string;
   providerLabel: string;
+  tagline: string;
   modelId: string;
   modelLabel: string;
 }
@@ -50,6 +52,7 @@ function incrementTrialCount(): number {
 }
 
 type AppState = "input" | "processing" | "calendar";
+type ProcessingStage = "transcript" | "generating" | "done";
 
 function getAuthHeaders(session: Session | null): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -119,6 +122,31 @@ function calendarResultFromDb(video: Record<string, unknown>, items: Record<stri
   return { posts, articles, calendar };
 }
 
+function buildPlainText(result: LinkedInResult): string {
+  const lines: string[] = [];
+  for (const entry of result.calendar) {
+    const isArticle = entry.type === "article";
+    const item = isArticle ? result.articles[entry.contentIndex] : result.posts[entry.contentIndex];
+    if (!item) continue;
+    lines.push(`=== ${entry.day} | ${entry.type === "article" ? "Article" : "Post"} | ${entry.recommendedTime} ===`);
+    if ("hook" in item) {
+      lines.push(item.hook, "", item.body);
+    } else {
+      lines.push(item.title, "", item.body);
+    }
+    if ("imagePrompt" in item && (item as LinkedInPost).imagePrompt) {
+      lines.push("", `[Image Prompt: ${(item as LinkedInPost).imagePrompt}]`);
+    }
+    if ("imagePrompts" in item) {
+      for (const [i, p] of (item as LinkedInArticle).imagePrompts.entries()) {
+        lines.push("", `[Image Prompt ${i + 1}: ${p}]`);
+      }
+    }
+    lines.push("", "");
+  }
+  return lines.join("\n");
+}
+
 export default function Home() {
   const [appState, setAppState] = useState<AppState>("input");
   const [session, setSession] = useState<Session | null>(null);
@@ -135,6 +163,8 @@ export default function Home() {
   const [supabase] = useState(() => getSupabaseBrowser());
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState<{ providerId: string; modelId: string } | null>(null);
+  const [processingStage, setProcessingStage] = useState<ProcessingStage>("transcript");
+  const abortRef = useRef(false);
 
   useEffect(() => {
     fetch("/api/models")
@@ -195,7 +225,9 @@ export default function Home() {
 
     setLoading(true);
     setError("");
+    setProcessingStage("transcript");
     setAppState("processing");
+    abortRef.current = false;
 
     try {
       const transcriptRes = await fetch("/api/transcript", {
@@ -205,8 +237,10 @@ export default function Home() {
       });
       const transcriptData = await transcriptRes.json();
       if (!transcriptRes.ok) throw new Error(transcriptData.error || "Failed to fetch transcript");
+      if (abortRef.current) return;
 
       setVideoTitle(transcriptData.title || "YouTube video");
+      setProcessingStage("generating");
 
       const generateRes = await fetch("/api/generate", {
         method: "POST",
@@ -231,6 +265,7 @@ export default function Home() {
         const genResult = data.result as LinkedInResult;
         setResult(genResult);
         setVideoTitle(transcriptData.title || "YouTube video");
+        setProcessingStage("done");
 
         if (!session) {
           const newCount = incrementTrialCount();
@@ -253,7 +288,7 @@ export default function Home() {
           } catch { /* save failed, calendar still shows in-memory */ }
         }
 
-        setAppState("calendar");
+        setTimeout(() => setAppState("calendar"), 400);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -296,20 +331,22 @@ export default function Home() {
 
   const handleCopyAll = async () => {
     if (!result) return;
-    const lines: string[] = [];
-    for (const entry of result.calendar) {
-      const isArticle = entry.type === "article";
-      const item = isArticle ? result.articles[entry.contentIndex] : result.posts[entry.contentIndex];
-      if (!item) continue;
-      lines.push(`--- ${entry.day} · ${entry.type === "article" ? "Article" : "Post"} · ${entry.recommendedTime} ---`);
-      if ("hook" in item) {
-        lines.push(item.hook, "", item.body);
-      } else {
-        lines.push(item.title, "", item.body);
-      }
-      lines.push("");
-    }
-    await navigator.clipboard.writeText(lines.join("\n"));
+    const text = buildPlainText(result);
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch { /* clipboard denied */ }
+  };
+
+  const handleDownloadTxt = () => {
+    if (!result) return;
+    const text = buildPlainText(result);
+    const blob = new Blob([text], { type: "text/plain" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `link2post-${videoTitle.replace(/[^a-z0-9]/gi, "-").toLowerCase()}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   const handleSignupWallDismiss = () => {
@@ -330,10 +367,13 @@ export default function Home() {
       )}
 
       <main className="flex flex-col items-center justify-center min-h-[100dvh] px-5">
+        <div className="fixed top-4 right-4 z-40">
+          <ThemeToggle />
+        </div>
         {appState === "input" && (
-          <div className="flex flex-col items-center">
-            <div className="mb-8 text-center">
-              <h1 className="text-xl font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
+          <div className="flex flex-col items-center w-full max-w-[600px]">
+            <div className="mb-6 text-center">
+              <h1 className="text-2xl font-bold mb-1" style={{ color: "var(--text-primary)" }}>
                 Link2Post
               </h1>
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
@@ -361,19 +401,52 @@ export default function Home() {
 
             {!session && trialsRemaining === 1 && (
               <p className="text-[11px] mt-3" style={{ color: "var(--text-muted)" }}>
-                1 free generation remaining — sign up to keep your calendars
+                1 free generation left — <button onClick={() => setShowSignupWall(true)} className="underline" style={{ color: "var(--accent)" }}>sign up</button> to save calendars &amp; get unlimited
               </p>
             )}
 
             {error && (
               <p className="text-xs mt-3 max-w-[520px] text-center" style={{ color: "#ef4444" }}>{error}</p>
             )}
+
+            <div className="mt-10 w-full">
+              <p className="text-[11px] text-center mb-4" style={{ color: "var(--text-muted)" }}>
+                What you get from one YouTube link:
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { icon: "post", label: "3 LinkedIn Posts", desc: "Hooks, stories, CTAs" },
+                  { icon: "article", label: "1 LinkedIn Article", desc: "Long-form with image prompts" },
+                  { icon: "calendar", label: "Content Calendar", desc: "Best times to post" },
+                ].map((item) => (
+                  <div
+                    key={item.label}
+                    className="rounded-xl px-3 py-4 text-center"
+                    style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border-light)" }}
+                  >
+                    <div className="w-8 h-8 rounded-lg mx-auto mb-2 flex items-center justify-center" style={{ background: "rgba(16,163,127,0.12)" }}>
+                      {item.icon === "post" && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      )}
+                      {item.icon === "article" && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                      )}
+                      {item.icon === "calendar" && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      )}
+                    </div>
+                    <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>{item.label}</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: "var(--text-muted)" }}>{item.desc}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
         {appState === "processing" && (
           <div className="flex flex-col items-center">
-            <ProcessingStages videoTitle={videoTitle} />
+            <ProcessingStages videoTitle={videoTitle} stage={processingStage} />
           </div>
         )}
 
@@ -385,6 +458,7 @@ export default function Home() {
             session={session}
             onRegenerate={handleRegenerate}
             onCopyAll={handleCopyAll}
+            onDownloadTxt={handleDownloadTxt}
             onNewVideo={() => { setAppState("input"); setResult(null); setVideoTitle(""); }}
           />
         )}

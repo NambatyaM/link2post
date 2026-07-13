@@ -5,6 +5,7 @@ import { useState, useRef, useEffect } from "react";
 interface ModelOption {
   providerId: string;
   providerLabel: string;
+  tagline: string;
   modelId: string;
   modelLabel: string;
 }
@@ -58,7 +59,11 @@ export default function ModelSelector({
           <path d="M2 17l10 5 10-5" />
           <path d="M2 12l10 5 10-5" />
         </svg>
-        {current ? `${current.providerLabel} / ${current.modelLabel}` : "Select model"}
+        {current ? (
+          <span>{current.tagline} <span style={{ color: "var(--text-muted)" }}>via {current.providerLabel}</span></span>
+        ) : (
+          "Auto-select best model"
+        )}
         <svg
           width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
           style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.15s" }}
@@ -69,22 +74,38 @@ export default function ModelSelector({
 
       {open && (
         <div
-          className="absolute right-0 top-full mt-1 w-72 rounded-xl overflow-hidden z-50 py-1"
+          className="absolute right-0 top-full mt-1 w-80 rounded-xl overflow-hidden z-50 py-1"
           style={{
             background: "var(--bg-secondary)",
             border: "1px solid var(--border)",
             boxShadow: "0 8px 32px rgba(0,0,0,0.4)",
           }}
         >
+          <div className="px-3 py-2 border-b" style={{ borderColor: "var(--border-light)" }}>
+            <p className="text-[10px] font-medium" style={{ color: "var(--text-muted)" }}>
+              Choose AI model — all are free
+            </p>
+          </div>
           {Object.entries(grouped).map(([providerId, models]) => {
             const providerLabel = models[0].providerLabel;
+            const tagline = models[0].tagline;
             return (
               <div key={providerId}>
                 <div
-                  className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wider"
-                  style={{ color: "var(--text-muted)" }}
+                  className="px-3 py-1.5 flex items-center gap-2"
                 >
-                  {providerLabel}
+                  <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>
+                    {providerLabel}
+                  </span>
+                  <span
+                    className="text-[9px] px-1.5 py-0.5 rounded-md font-medium"
+                    style={{
+                      background: "rgba(16,163,127,0.1)",
+                      color: "var(--accent)",
+                    }}
+                  >
+                    {tagline}
+                  </span>
                 </div>
                 {models.map((opt) => {
                   const isSelected =

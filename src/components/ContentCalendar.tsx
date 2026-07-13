@@ -25,6 +25,7 @@ export default function ContentCalendar({
   session,
   onRegenerate,
   onCopyAll,
+  onDownloadTxt,
   onNewVideo,
 }: {
   result: LinkedInResult;
@@ -33,6 +34,7 @@ export default function ContentCalendar({
   session: Session | null;
   onRegenerate: (type: "post" | "article", index: number) => void;
   onCopyAll: () => void;
+  onDownloadTxt: () => void;
   onNewVideo: () => void;
 }) {
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
@@ -72,6 +74,13 @@ export default function ContentCalendar({
             style={{ border: "1px solid var(--border)", color: copiedAll ? "var(--accent)" : "var(--text-muted)" }}
           >
             {copiedAll ? "Copied!" : "Copy all"}
+          </button>
+          <button
+            onClick={onDownloadTxt}
+            className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+            style={{ border: "1px solid var(--border)", color: "var(--text-muted)" }}
+          >
+            Download .txt
           </button>
           <button
             onClick={onNewVideo}

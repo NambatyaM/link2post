@@ -50,24 +50,18 @@ function StageIcon({ type, done }: { type: string; done: boolean }) {
   }
 }
 
-export default function ProcessingStages({ videoTitle }: { videoTitle?: string }) {
-  const [currentStage, setCurrentStage] = useState(0);
+export default function ProcessingStages({ videoTitle, stage }: { videoTitle?: string; stage?: "transcript" | "generating" | "done" }) {
   const [completedStages, setCompletedStages] = useState<number[]>([]);
 
   useEffect(() => {
-    const timers: NodeJS.Timeout[] = [];
-    for (let i = 0; i < STAGES.length; i++) {
-      timers.push(
-        setTimeout(() => {
-          setCompletedStages((prev) => [...prev, i]);
-          if (i < STAGES.length - 1) {
-            setCurrentStage(i + 1);
-          }
-        }, 1500 + i * 1800),
-      );
+    if (stage === "transcript") {
+      setCompletedStages([0]);
+    } else if (stage === "generating") {
+      setCompletedStages([0, 1, 2]);
+    } else if (stage === "done") {
+      setCompletedStages([0, 1, 2, 3]);
     }
-    return () => timers.forEach(clearTimeout);
-  }, []);
+  }, [stage]);
 
   return (
     <div className="w-full max-w-[400px]">
@@ -77,9 +71,9 @@ export default function ProcessingStages({ videoTitle }: { videoTitle?: string }
         </p>
       )}
       <div className="space-y-3">
-        {STAGES.map((stage, i) => {
+        {STAGES.map((s, i) => {
           const done = completedStages.includes(i);
-          const active = currentStage === i && !done;
+          const active = !done && (i === 0 || completedStages.includes(i - 1)) && i < STAGES.length && !completedStages.includes(i);
           return (
             <div key={i} className="flex items-center gap-3">
               <div
@@ -92,7 +86,7 @@ export default function ProcessingStages({ videoTitle }: { videoTitle?: string }
                 {active ? (
                   <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: "var(--accent)" }} />
                 ) : (
-                  <StageIcon type={stage.icon} done={done} />
+                  <StageIcon type={s.icon} done={done} />
                 )}
               </div>
               <span
@@ -102,7 +96,7 @@ export default function ProcessingStages({ videoTitle }: { videoTitle?: string }
                   fontWeight: active ? 500 : 400,
                 }}
               >
-                {stage.label}
+                {s.label}
               </span>
               {done && (
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="3" className="ml-auto shrink-0">

@@ -9,6 +9,7 @@ export async function GET() {
     entry.models.map((m) => ({
       providerId: entry.provider.id,
       providerLabel: entry.provider.label,
+      tagline: entry.provider.tagline,
       modelId: m.id,
       modelLabel: m.label,
     })),
