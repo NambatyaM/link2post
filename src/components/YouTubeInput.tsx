@@ -16,7 +16,7 @@ export default function YouTubeInput({
     e.preventDefault();
     const trimmed = url.trim();
     if (!trimmed) return;
-    const ytPattern = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)/;
+    const ytPattern = /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/|music\.youtube\.com\/watch\?v=)/;
     const idOnly = /^[a-zA-Z0-9_-]{11}$/;
     if (!ytPattern.test(trimmed) && !idOnly.test(trimmed)) {
       setError("Paste a valid YouTube URL.");

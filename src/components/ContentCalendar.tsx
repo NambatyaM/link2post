@@ -2,10 +2,13 @@
 
 import { useState } from "react";
 import { Session } from "@supabase/supabase-js";
-import type { LinkedInResult, CalendarEntry, LinkedInPost, LinkedInArticle } from "@/lib/types";
+import type { LinkedInResult, CalendarEntry, LinkedInPost, LinkedInArticle, VideoScript, CarouselSlide } from "@/lib/types";
 import ExpandedDayView from "./ExpandedDayView";
+import VideoScriptView from "./VideoScriptView";
+import PDFExporter from "./PDFExporter";
 
 const WEEK_DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+type Tab = "calendar" | "script" | "carousel";
 
 function getItemForEntry(result: LinkedInResult, entry: CalendarEntry): LinkedInPost | LinkedInArticle | null {
   if (entry.type === "post") return result.posts[entry.contentIndex] ?? null;
@@ -23,22 +26,31 @@ export default function ContentCalendar({
   timezone,
   videoTitle,
   session,
+  script,
+  carouselSlides,
   onRegenerate,
   onCopyAll,
   onDownloadTxt,
+  onGenerateScript,
+  onGenerateCarousel,
   onNewVideo,
 }: {
   result: LinkedInResult;
   timezone: string;
   videoTitle: string;
   session: Session | null;
+  script: VideoScript | null;
+  carouselSlides: CarouselSlide[] | null;
   onRegenerate: (type: "post" | "article", index: number) => void;
   onCopyAll: () => void;
   onDownloadTxt: () => void;
+  onGenerateScript: () => void;
+  onGenerateCarousel: () => void;
   onNewVideo: () => void;
 }) {
   const [expandedDay, setExpandedDay] = useState<string | null>(null);
   const [copiedAll, setCopiedAll] = useState(false);
+  const [activeTab, setActiveTab] = useState<Tab>("calendar");
 
   const tzShort = Intl.DateTimeFormat().resolvedOptions().timeZone?.split("/").pop()?.replace(/_/g, " ") || timezone;
 
@@ -92,8 +104,30 @@ export default function ContentCalendar({
         </div>
       </div>
 
-      <div className="space-y-2">
-        {WEEK_DAYS.map((day) => {
+      <div className="flex gap-1 mb-5 p-1 rounded-xl" style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border-light)" }}>
+        {([
+          { id: "calendar" as Tab, label: "Posts & Articles" },
+          { id: "script" as Tab, label: "Video Script" },
+          { id: "carousel" as Tab, label: "Carousel" },
+        ]).map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className="flex-1 text-xs font-medium py-2 rounded-lg transition-colors"
+            style={{
+              background: activeTab === tab.id ? "var(--bg-primary)" : "transparent",
+              color: activeTab === tab.id ? "var(--text-primary)" : "var(--text-muted)",
+              border: activeTab === tab.id ? "1px solid var(--border-light)" : "1px solid transparent",
+            }}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "calendar" && (
+        <div className="space-y-2">
+          {WEEK_DAYS.map((day) => {
           const entry = entriesByDay[day];
           const isExpanded = expandedDay === day;
 
@@ -178,7 +212,54 @@ export default function ContentCalendar({
             </div>
           );
         })}
-      </div>
+        </div>
+      )}
+
+      {activeTab === "script" && (
+        <div>
+          {script ? (
+            <VideoScriptView script={script} />
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: "rgba(16,163,127,0.12)" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="5"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+              </div>
+              <p className="text-sm font-medium mb-1" style={{ color: "var(--text-primary)" }}>Generate a short video script</p>
+              <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>Turn this video into a 60-second Reel, TikTok, or Short</p>
+              <button
+                onClick={onGenerateScript}
+                className="text-xs font-medium px-4 py-2 rounded-lg transition-colors"
+                style={{ background: "var(--accent)", color: "white" }}
+              >
+                Generate script
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeTab === "carousel" && (
+        <div>
+          {carouselSlides ? (
+            <PDFExporter slides={carouselSlides} videoTitle={videoTitle} />
+          ) : (
+            <div className="text-center py-12">
+              <div className="w-12 h-12 rounded-full mx-auto mb-3 flex items-center justify-center" style={{ background: "rgba(16,163,127,0.12)" }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+              </div>
+              <p className="text-sm font-medium mb-1" style={{ color: "var(--text-primary)" }}>Generate a carousel</p>
+              <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>10-slide PDF carousel — 6x more engagement than text posts</p>
+              <button
+                onClick={onGenerateCarousel}
+                className="text-xs font-medium px-4 py-2 rounded-lg transition-colors"
+                style={{ background: "var(--accent)", color: "white" }}
+              >
+                Generate carousel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       <p className="text-[11px] mt-4 text-center" style={{ color: "var(--text-muted)" }}>
         Posting times based on research from Buffer, Sprout Social, and SocialPilot. Times shown in {tzShort}.

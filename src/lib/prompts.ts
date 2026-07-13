@@ -1,6 +1,61 @@
 import type { VideoInfo } from "./types";
 import { POSTING_SCHEDULE } from "./types";
 
+export const VIDEO_SCRIPT_SYSTEM_PROMPT = `You are a short-form video scriptwriter. You transform YouTube video transcripts into 60-second scripts optimized for TikTok, Instagram Reels, and YouTube Shorts.
+
+RULES:
+1. Extract the 3-4 most compelling points from the transcript
+2. Write in conversational, spoken-word style (not written-word)
+3. Keep total under 150 words (~60 seconds when spoken)
+4. Include visual direction for each section
+5. Add on-screen text overlay suggestions (captions)
+6. The hook must stop the scroll in the first 3 seconds
+
+STRUCTURE:
+- Hook (0:00-0:03): Pattern interrupt, bold claim, or relatable question
+- Problem (0:03-0:10): The pain point your audience feels
+- Solution (0:10-0:45): The insight, framework, or story with the answer
+- CTA (0:45-1:00): What to do next, follow prompt, or save prompt
+
+Return ONLY valid JSON with this structure:
+{
+  "sections": [
+    {
+      "label": "Hook",
+      "timestamp": "0:00",
+      "duration": "3 sec",
+      "script": "What to say out loud",
+      "visual": "What to show on screen",
+      "caption": "On-screen text overlay"
+    }
+  ],
+  "totalDuration": "60 seconds",
+  "platformNotes": "Works for Reels, TikTok, YouTube Shorts"
+}`;
+
+export const CAROUSEL_SYSTEM_PROMPT = `You are a carousel content strategist. You transform YouTube video transcripts into a 10-slide LinkedIn carousel.
+
+RULES:
+1. Extract 10 key takeaways from the transcript
+2. First slide = hook/title slide that stops the scroll
+3. Last slide = CTA/follow slide
+4. Middle slides = one takeaway per slide
+5. Write concise: title max 8 words, body max 30 words per slide
+6. Each slide should be standalone — understandable without seeing other slides
+7. Use numbers, bullet points, or short paragraphs for readability
+
+Return ONLY valid JSON with this structure:
+{
+  "slides": [
+    {
+      "slideNumber": 1,
+      "title": "Slide title (max 8 words)",
+      "body": "Slide body text (max 30 words)",
+      "notes": "Design notes for this slide"
+    }
+  ]
+}`;
+
 export const SYSTEM_PROMPT = `You are LinkedInForge, an expert LinkedIn content strategist. You transform YouTube video transcripts into a full week of LinkedIn-ready content: standalone posts, long-form articles, image prompts for each piece, and a content calendar with smart posting times.
 
 --- STEP 0: TRANSCRIPT INTAKE ---
@@ -255,4 +310,69 @@ Return ONLY the JSON for a single article:
   "body": "New article body with section headings and [IMAGE PROMPT N] markers",
   "imagePrompts": ["Image prompt 1", "Image prompt 2", "Image prompt 3", "Image prompt 4"]
 }`;
+}
+
+export function buildVideoScriptPrompt(videoInfo: VideoInfo): string {
+  return `CREATE A 60-SECOND SHORT VIDEO SCRIPT FROM THIS VIDEO:
+
+---VIDEO TITLE---
+${videoInfo.title}
+
+---VIDEO DESCRIPTION---
+${videoInfo.description.slice(0, 500)}
+
+---VIDEO TRANSCRIPT---
+${videoInfo.transcript.slice(0, 15000)}
+
+---INSTRUCTIONS---
+
+Extract the 3-4 most compelling points from this transcript and create a 60-second short-form video script.
+
+1. HOOK (0:00-0:03): A pattern interrupt, bold claim, or relatable question that stops the scroll. This is the most important line.
+2. PROBLEM (0:03-0:10): The pain point or frustration the audience feels. Make it relatable.
+3. SOLUTION (0:10-0:45): The core insight, framework, or story. This is where 80% of the value lives. Include specific details, numbers, or examples from the video.
+4. CTA (0:45-1:00): What to do next — follow, save, or a specific action.
+
+STYLE RULES:
+- Write in conversational, spoken-word style (like you're talking to a friend)
+- NOT written-word style (no formal language, no paragraphs)
+- Keep total under 150 words
+- Include specific details from the transcript, not generic advice
+
+For each section, also provide:
+- visual: What to show on screen (B-roll, text overlays, face-to-camera)
+- caption: On-screen text overlay that reinforces the spoken words
+
+Return the complete JSON response now.`;
+}
+
+export function buildCarouselPrompt(videoInfo: VideoInfo): string {
+  return `CREATE A 10-SLIDE LINKEDIN CAROUSEL FROM THIS VIDEO:
+
+---VIDEO TITLE---
+${videoInfo.title}
+
+---VIDEO DESCRIPTION---
+${videoInfo.description.slice(0, 500)}
+
+---VIDEO TRANSCRIPT---
+${videoInfo.transcript.slice(0, 15000)}
+
+---INSTRUCTIONS---
+
+Extract 10 key takeaways from this video and create a 10-slide LinkedIn carousel.
+
+SLIDE STRUCTURE:
+- Slide 1 (Hook): Bold title that stops the scroll. This is the cover slide.
+- Slides 2-9 (Content): One key takeaway per slide. Use numbers, bullet points, or short paragraphs.
+- Slide 10 (CTA): Call to action — follow, save, comment, or visit link.
+
+RULES:
+- Title: max 8 words per slide
+- Body: max 30 words per slide
+- Each slide should be standalone (understandable without seeing others)
+- Use specific details, numbers, and examples from the transcript
+- No generic advice — every slide should have a concrete insight
+
+Return the complete JSON response now.`;
 }

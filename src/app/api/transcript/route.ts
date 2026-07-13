@@ -69,6 +69,37 @@ async function fetchSubtitles(videoId: string): Promise<string> {
     } catch { /* try next lang */ }
   }
 
+  try {
+    const res = await fetchWithTimeout(
+      `https://www.youtube.com/watch?v=${videoId}`,
+      { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" } },
+      15000,
+    );
+    if (res.ok) {
+      const html = await res.text();
+
+      const captionTracksMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
+      if (captionTracksMatch) {
+        try {
+          const tracks = JSON.parse(captionTracksMatch[1]);
+          const enTrack = tracks.find((t: { languageCode: string }) => t.languageCode?.startsWith("en")) || tracks[0];
+          if (enTrack?.baseUrl) {
+            const captionRes = await fetchWithTimeout(enTrack.baseUrl, {}, 10000);
+            if (captionRes.ok) {
+              const xml = await captionRes.text();
+              const texts = xml.match(/<text[^>]*>(.*?)<\/text>/g);
+              if (texts && texts.length > 0) {
+                return texts
+                  .map((t) => t.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&quot;/g, '"'))
+                  .join(" ");
+              }
+            }
+          }
+        } catch { /* continue */ }
+      }
+    }
+  } catch { /* continue */ }
+
   return "";
 }
 

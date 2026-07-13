@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 
 const STAGES = [
   { label: "Reading your video", icon: "video" },
@@ -51,16 +51,11 @@ function StageIcon({ type, done }: { type: string; done: boolean }) {
 }
 
 export default function ProcessingStages({ videoTitle, stage }: { videoTitle?: string; stage?: "transcript" | "generating" | "done" }) {
-  const [completedStages, setCompletedStages] = useState<number[]>([]);
-
-  useEffect(() => {
-    if (stage === "transcript") {
-      setCompletedStages([0]);
-    } else if (stage === "generating") {
-      setCompletedStages([0, 1, 2]);
-    } else if (stage === "done") {
-      setCompletedStages([0, 1, 2, 3]);
-    }
+  const completedStages = useMemo(() => {
+    if (stage === "transcript") return [0];
+    if (stage === "generating") return [0, 1, 2];
+    if (stage === "done") return [0, 1, 2, 3];
+    return [];
   }, [stage]);
 
   return (

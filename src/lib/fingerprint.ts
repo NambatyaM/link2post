@@ -1,5 +1,5 @@
-const DEVICE_KEY = "contentrep_device_id";
-const TRIAL_KEY = "contentrep_trial_count";
+const DEVICE_KEY = "link2post_device_id";
+const TRIAL_KEY = "link2post_trials";
 
 export function getOrCreateDeviceId(): string {
   if (typeof window === "undefined") return "";

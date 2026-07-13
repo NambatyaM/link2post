@@ -3,13 +3,15 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Session } from "@supabase/supabase-js";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
-import type { LinkedInResult, LinkedInPost, LinkedInArticle } from "@/lib/types";
+import type { LinkedInResult, LinkedInPost, LinkedInArticle, VideoScript, VideoInfo, CarouselSlide } from "@/lib/types";
 import YouTubeInput from "@/components/YouTubeInput";
 import ProcessingStages from "@/components/ProcessingStages";
 import ContentCalendar from "@/components/ContentCalendar";
 import AuthScreen from "@/components/AuthScreen";
 import ModelSelector from "@/components/ModelSelector";
 import ThemeToggle from "@/components/ThemeToggle";
+import VideosLibrary from "@/components/VideosLibrary";
+import ReferralBanner from "@/components/ReferralBanner";
 import { TRIAL_LIMIT } from "@/lib/constants";
 
 interface ModelOption {
@@ -51,7 +53,7 @@ function incrementTrialCount(): number {
   return next;
 }
 
-type AppState = "input" | "processing" | "calendar";
+type AppState = "input" | "processing" | "calendar" | "library";
 type ProcessingStage = "transcript" | "generating" | "done";
 
 function getAuthHeaders(session: Session | null): Record<string, string> {
@@ -164,6 +166,9 @@ export default function Home() {
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState<{ providerId: string; modelId: string } | null>(null);
   const [processingStage, setProcessingStage] = useState<ProcessingStage>("transcript");
+  const [script, setScript] = useState<VideoScript | null>(null);
+  const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[] | null>(null);
+  const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
   const abortRef = useRef(false);
 
   useEffect(() => {
@@ -174,6 +179,13 @@ export default function Home() {
         if (data.default) setSelectedModel(data.default);
       })
       .catch(() => {});
+
+    const params = new URLSearchParams(window.location.search);
+    const ref = params.get("ref");
+    if (ref) {
+      localStorage.setItem("link2post_ref", ref);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
   }, []);
 
   const loadActiveCalendar = useCallback(async (sess: Session) => {
@@ -201,6 +213,14 @@ export default function Home() {
       setSession(sess);
       if (sess) {
         loadActiveCalendar(sess);
+        const ref = localStorage.getItem("link2post_ref");
+        if (ref) {
+          fetch("/api/referral/apply", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${sess.access_token}` },
+            body: JSON.stringify({ code: ref }),
+          }).then(() => localStorage.removeItem("link2post_ref")).catch(() => {});
+        }
       }
     });
 
@@ -213,6 +233,23 @@ export default function Home() {
 
     return () => subscription.unsubscribe();
   }, [supabase, loadActiveCalendar]);
+
+  const loadVideoCalendar = useCallback(async (videoId: string) => {
+    if (!session) return;
+    try {
+      const res = await fetch(`/api/calendar/${videoId}`, {
+        headers: getAuthHeaders(session),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.video && data.items?.length > 0) {
+          setResult(calendarResultFromDb(data.video, data.items));
+          setVideoTitle(data.video.title || "");
+          setAppState("calendar");
+        }
+      }
+    } catch { /* failed to load */ }
+  }, [session]);
 
   const trialsRemaining = Math.max(0, TRIAL_LIMIT - trialCount);
   const isTrialExhausted = !session && trialsRemaining <= 0;
@@ -240,6 +277,7 @@ export default function Home() {
       if (abortRef.current) return;
 
       setVideoTitle(transcriptData.title || "YouTube video");
+      setVideoInfo(transcriptData);
       setProcessingStage("generating");
 
       const generateRes = await fetch("/api/generate", {
@@ -353,6 +391,50 @@ export default function Home() {
     setShowSignupWall(false);
   };
 
+  const handleGenerateScript = async () => {
+    if (!result || !videoInfo) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/generate-script", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          videoInfo,
+          provider: selectedModel?.providerId,
+          model: selectedModel?.modelId,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.script) {
+        setScript(data.script);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGenerateCarousel = async () => {
+    if (!result || !videoInfo) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/generate-carousel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          videoInfo,
+          provider: selectedModel?.providerId,
+          model: selectedModel?.modelId,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.slides) {
+        setCarouselSlides(data.slides);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <>
       {showSignupWall && (
@@ -367,7 +449,25 @@ export default function Home() {
       )}
 
       <main className="flex flex-col items-center justify-center min-h-[100dvh] px-5">
-        <div className="fixed top-4 right-4 z-40">
+        <div className="fixed top-4 right-4 z-40 flex items-center gap-2">
+          {session && appState !== "library" && (
+            <button
+              onClick={() => setAppState("library")}
+              className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+              style={{ border: "1px solid var(--border)", color: "var(--text-muted)" }}
+            >
+              My Videos
+            </button>
+          )}
+          {appState === "library" && (
+            <button
+              onClick={() => setAppState("input")}
+              className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+              style={{ border: "1px solid var(--border)", color: "var(--text-muted)" }}
+            >
+              New video
+            </button>
+          )}
           <ThemeToggle />
         </div>
         {appState === "input" && (
@@ -415,9 +515,12 @@ export default function Home() {
               </p>
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { icon: "post", label: "3 LinkedIn Posts", desc: "Hooks, stories, CTAs" },
-                  { icon: "article", label: "1 LinkedIn Article", desc: "Long-form with image prompts" },
+                  { icon: "post", label: "LinkedIn Posts", desc: "Hooks, stories, CTAs" },
+                  { icon: "article", label: "LinkedIn Article", desc: "Long-form with image prompts" },
                   { icon: "calendar", label: "Content Calendar", desc: "Best times to post" },
+                  { icon: "script", label: "Video Script", desc: "60-sec Reels & TikToks" },
+                  { icon: "carousel", label: "PDF Carousel", desc: "10 slides, download ready" },
+                  { icon: "library", label: "Video Library", desc: "Save & revisit anytime" },
                 ].map((item) => (
                   <div
                     key={item.label}
@@ -433,6 +536,15 @@ export default function Home() {
                       )}
                       {item.icon === "calendar" && (
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                      )}
+                      {item.icon === "script" && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="5"/><polygon points="10 8 16 12 10 16 10 8"/></svg>
+                      )}
+                      {item.icon === "carousel" && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+                      )}
+                      {item.icon === "library" && (
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg>
                       )}
                     </div>
                     <p className="text-xs font-medium" style={{ color: "var(--text-primary)" }}>{item.label}</p>
@@ -451,15 +563,30 @@ export default function Home() {
         )}
 
         {appState === "calendar" && result && (
-          <ContentCalendar
-            result={result}
-            timezone={timezone}
-            videoTitle={videoTitle}
+          <div className="w-full max-w-[768px] mx-auto">
+            {session && <ReferralBanner session={session} />}
+            <ContentCalendar
+              result={result}
+              timezone={timezone}
+              videoTitle={videoTitle}
+              session={session}
+              script={script}
+              carouselSlides={carouselSlides}
+              onRegenerate={handleRegenerate}
+              onCopyAll={handleCopyAll}
+              onDownloadTxt={handleDownloadTxt}
+              onGenerateScript={handleGenerateScript}
+              onGenerateCarousel={handleGenerateCarousel}
+              onNewVideo={() => { setAppState("input"); setResult(null); setVideoTitle(""); setScript(null); setCarouselSlides(null); setVideoInfo(null); }}
+            />
+          </div>
+        )}
+
+        {appState === "library" && session && (
+          <VideosLibrary
             session={session}
-            onRegenerate={handleRegenerate}
-            onCopyAll={handleCopyAll}
-            onDownloadTxt={handleDownloadTxt}
-            onNewVideo={() => { setAppState("input"); setResult(null); setVideoTitle(""); }}
+            onSelectVideo={loadVideoCalendar}
+            onNewVideo={() => setAppState("input")}
           />
         )}
       </main>

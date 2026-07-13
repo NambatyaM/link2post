@@ -1,15 +1,20 @@
 "use client";
 
-export default function ThemeToggle() {
-  const toggle = () => {
-    const isLight = document.documentElement.classList.toggle("light");
-    localStorage.setItem("link2post_theme", isLight ? "light" : "dark");
-  };
+import { useState } from "react";
 
-  const isLight =
-    typeof window !== "undefined"
-      ? document.documentElement.classList.contains("light")
-      : false;
+export default function ThemeToggle() {
+  const [isLight, setIsLight] = useState(() => {
+    if (typeof document !== "undefined") {
+      return document.documentElement.classList.contains("light");
+    }
+    return false;
+  });
+
+  const toggle = () => {
+    const newIsLight = document.documentElement.classList.toggle("light");
+    setIsLight(newIsLight);
+    localStorage.setItem("link2post_theme", newIsLight ? "light" : "dark");
+  };
 
   return (
     <button

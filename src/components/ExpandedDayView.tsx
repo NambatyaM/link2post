@@ -20,6 +20,9 @@ export default function ExpandedDayView({
   const [editingText, setEditingText] = useState(item.body);
   const [imagePromptExpanded, setImagePromptExpanded] = useState(false);
   const [feedback, setFeedback] = useState<"up" | "down" | null>(entry.feedback || null);
+  const [feedbackText, setFeedbackText] = useState("");
+  const [feedbackSaved, setFeedbackSaved] = useState(false);
+  const [showFeedbackInput, setShowFeedbackInput] = useState(false);
 
   const isArticle = entry.type === "article";
   const articleItem = isArticle ? (item as LinkedInArticle) : null;
@@ -65,6 +68,13 @@ export default function ExpandedDayView({
   const handleFeedback = async (value: "up" | "down") => {
     const newFeedback = feedback === value ? null : value;
     setFeedback(newFeedback);
+    if (newFeedback === "down") {
+      setShowFeedbackInput(true);
+    } else {
+      setShowFeedbackInput(false);
+      setFeedbackText("");
+      setFeedbackSaved(false);
+    }
     if (session && entry.itemId) {
       fetch("/api/feedback", {
         method: "POST",
@@ -72,6 +82,17 @@ export default function ExpandedDayView({
         body: JSON.stringify({ itemId: entry.itemId, feedback: newFeedback }),
       }).catch(() => {});
     }
+  };
+
+  const handleFeedbackSubmit = async () => {
+    if (!session || !entry.itemId || !feedbackText.trim()) return;
+    setFeedbackSaved(true);
+    fetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${session.access_token}` },
+      body: JSON.stringify({ itemId: entry.itemId, feedback, feedbackText: feedbackText.trim() }),
+    }).catch(() => {});
+    setTimeout(() => setFeedbackSaved(false), 2000);
   };
 
   return (
@@ -214,6 +235,31 @@ export default function ExpandedDayView({
             </button>
           </div>
         </div>
+
+        {showFeedbackInput && feedback === "down" && (
+          <div className="mt-3 rounded-lg px-3 py-2.5" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border-light)" }}>
+            <p className="text-[11px] mb-2" style={{ color: "var(--text-muted)" }}>What would you improve?</p>
+            <textarea
+              value={feedbackText}
+              onChange={(e) => setFeedbackText(e.target.value)}
+              placeholder="Too formal, needs a CTA, too long..."
+              className="w-full text-xs leading-relaxed resize-none rounded-lg px-3 py-2 outline-none"
+              style={{ background: "var(--bg-primary)", color: "var(--text-primary)", border: "1px solid var(--border-light)", minHeight: "60px" }}
+              maxLength={500}
+            />
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>{feedbackText.length}/500</p>
+              <button
+                onClick={handleFeedbackSubmit}
+                disabled={!feedbackText.trim()}
+                className="text-[11px] font-medium px-3 py-1 rounded-lg transition-colors disabled:opacity-40"
+                style={{ background: "var(--accent)", color: "white" }}
+              >
+                {feedbackSaved ? "Saved!" : "Save feedback"}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -9,9 +9,10 @@ export async function POST(req: NextRequest) {
     const user = await verifyToken(token);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { itemId, feedback } = await req.json() as {
+    const { itemId, feedback, feedbackText } = await req.json() as {
       itemId: string;
       feedback: "up" | "down" | null;
+      feedbackText?: string;
     };
 
     if (!itemId) {
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
     if (feedback === null) {
       const { error } = await supabase
         .from("calendar_items")
-        .update({ feedback: null, feedback_at: null })
+        .update({ feedback: null, feedback_at: null, feedback_text: null })
         .eq("id", itemId)
         .eq("user_id", user.userId);
 
@@ -38,7 +39,11 @@ export async function POST(req: NextRequest) {
 
       const { error } = await supabase
         .from("calendar_items")
-        .update({ feedback, feedback_at: new Date().toISOString() })
+        .update({
+          feedback,
+          feedback_at: new Date().toISOString(),
+          feedback_text: feedback === "down" && feedbackText ? feedbackText.slice(0, 500) : null,
+        })
         .eq("id", itemId)
         .eq("user_id", user.userId);
 

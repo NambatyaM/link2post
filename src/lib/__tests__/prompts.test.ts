@@ -1,4 +1,4 @@
-import { SYSTEM_PROMPT, buildYouTubePrompt, buildRegeneratePrompt } from "@/lib/prompts";
+import { SYSTEM_PROMPT, buildYouTubePrompt, buildRegeneratePrompt, VIDEO_SCRIPT_SYSTEM_PROMPT, CAROUSEL_SYSTEM_PROMPT, buildVideoScriptPrompt, buildCarouselPrompt } from "@/lib/prompts";
 
 describe("prompts", () => {
   it("SYSTEM_PROMPT contains all rule sections", () => {
@@ -84,5 +84,69 @@ describe("prompts", () => {
     expect(result).toContain("My Video");
     expect(result).toContain("800-1,500 words");
     expect(result).toContain("[IMAGE PROMPT N]");
+  });
+
+  it("VIDEO_SCRIPT_SYSTEM_PROMPT contains structure sections", () => {
+    expect(VIDEO_SCRIPT_SYSTEM_PROMPT).toContain("Hook");
+    expect(VIDEO_SCRIPT_SYSTEM_PROMPT).toContain("Problem");
+    expect(VIDEO_SCRIPT_SYSTEM_PROMPT).toContain("Solution");
+    expect(VIDEO_SCRIPT_SYSTEM_PROMPT).toContain("CTA");
+    expect(VIDEO_SCRIPT_SYSTEM_PROMPT).toContain("150 words");
+    expect(VIDEO_SCRIPT_SYSTEM_PROMPT).toContain("caption");
+    expect(VIDEO_SCRIPT_SYSTEM_PROMPT).toContain("visual");
+  });
+
+  it("buildVideoScriptPrompt includes video info", () => {
+    const result = buildVideoScriptPrompt(
+      { title: "Test Video", description: "A test", transcript: "Hello world", url: "https://youtube.com/watch?v=abc", videoId: "abc" },
+    );
+    expect(result).toContain("Test Video");
+    expect(result).toContain("Hello world");
+    expect(result).toContain("60-SECOND");
+    expect(result).toContain("HOOK");
+    expect(result).toContain("PROBLEM");
+    expect(result).toContain("SOLUTION");
+    expect(result).toContain("CTA");
+  });
+
+  it("CAROUSEL_SYSTEM_PROMPT contains required fields", () => {
+    expect(CAROUSEL_SYSTEM_PROMPT).toContain("10-slide");
+    expect(CAROUSEL_SYSTEM_PROMPT).toContain("slideNumber");
+    expect(CAROUSEL_SYSTEM_PROMPT).toContain("title");
+    expect(CAROUSEL_SYSTEM_PROMPT).toContain("body");
+    expect(CAROUSEL_SYSTEM_PROMPT).toContain("notes");
+    expect(CAROUSEL_SYSTEM_PROMPT).toContain("30 words");
+  });
+
+  it("buildCarouselPrompt includes video info", () => {
+    const result = buildCarouselPrompt(
+      { title: "My Video", description: "Description text", transcript: "Video transcript", url: "https://youtube.com/watch?v=xyz", videoId: "xyz" },
+    );
+    expect(result).toContain("My Video");
+    expect(result).toContain("Description text");
+    expect(result).toContain("Video transcript");
+    expect(result).toContain("10-SLIDE");
+    expect(result).toContain("Slide 1");
+    expect(result).toContain("Slide 10");
+  });
+
+  it("buildCarouselPrompt includes slide structure rules", () => {
+    const result = buildCarouselPrompt(
+      { title: "V", description: "D", transcript: "T", url: "u", videoId: "x" },
+    );
+    expect(result).toContain("max 8 words");
+    expect(result).toContain("max 30 words");
+    expect(result).toContain("standalone");
+  });
+
+  it("buildVideoScriptPrompt includes style rules", () => {
+    const result = buildVideoScriptPrompt(
+      { title: "V", description: "D", transcript: "T", url: "u", videoId: "x" },
+    );
+    expect(result).toContain("conversational");
+    expect(result).toContain("spoken-word");
+    expect(result).toContain("150 words");
+    expect(result).toContain("visual");
+    expect(result).toContain("caption");
   });
 });

@@ -38,6 +38,28 @@ export interface VideoInfo {
 
 export type ContentType = "post" | "article";
 
+export interface VideoScriptSection {
+  label: string;
+  timestamp: string;
+  duration: string;
+  script: string;
+  visual: string;
+  caption: string;
+}
+
+export interface VideoScript {
+  sections: VideoScriptSection[];
+  totalDuration: string;
+  platformNotes: string;
+}
+
+export interface CarouselSlide {
+  slideNumber: number;
+  title: string;
+  body: string;
+  notes: string;
+}
+
 export interface PostingTimeSlot {
   day: string;
   window: string;
