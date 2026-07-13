@@ -46,7 +46,20 @@ export default function TranscriptInput({
   const charCount = transcript.length;
 
   return (
-    <form onSubmit={handleSubmit} className="w-full">
+    <form onSubmit={handleSubmit} className="w-full flex flex-col gap-2.5">
+      <input
+        type="text"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        placeholder="Title (optional)"
+        className="w-full text-sm px-4 py-3 rounded-xl outline-none transition-all"
+        style={{
+          background: "var(--bg-secondary)",
+          color: "var(--text-primary)",
+          border: "1px solid var(--border)",
+        }}
+        disabled={isLoading}
+      />
       <div
         className="rounded-2xl transition-all"
         style={{
@@ -55,21 +68,12 @@ export default function TranscriptInput({
           boxShadow: "0 2px 12px rgba(0,0,0,0.06)",
         }}
       >
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Title (optional)"
-          className="w-full text-sm px-4 pt-3 pb-0 outline-none bg-transparent"
-          style={{ color: "var(--text-primary)" }}
-          disabled={isLoading}
-        />
         <textarea
           ref={textareaRef}
           value={transcript}
           onChange={(e) => { setTranscript(e.target.value); setError(""); }}
           placeholder="Paste your transcript here..."
-          className="w-full text-sm px-4 py-2 outline-none resize-none bg-transparent"
+          className="w-full text-sm px-4 py-3 outline-none resize-none bg-transparent"
           style={{
             color: "var(--text-primary)",
             minHeight: "48px",
@@ -101,7 +105,7 @@ export default function TranscriptInput({
         </div>
       </div>
       {error && (
-        <p className="text-xs mt-2 px-1" style={{ color: "#ef4444" }}>{error}</p>
+        <p className="text-xs px-1" style={{ color: "#ef4444" }}>{error}</p>
       )}
     </form>
   );
