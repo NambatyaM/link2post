@@ -1,6 +1,11 @@
 import { NextRequest } from "next/server";
 import { checkRateLimit, getRateLimitHeaders } from "@/lib/rate-limit";
+import { execFile } from "child_process";
+import { promisify } from "util";
+import { existsSync, writeFileSync, chmodSync, unlinkSync, readFileSync } from "fs";
+import { join } from "path";
 
+const execFileAsync = promisify(execFile);
 const CHROME_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
 
 function extractVideoId(url: string): string | null {
@@ -34,10 +39,10 @@ function decodeEntities(text: string): string {
 }
 
 function parseTranscriptXml(xml: string): string {
-  // srv3 format: <p t="ms" d="ms"><s>word</s>...</p>
-  const pRegex = /<p\s+t="(\d+)"\s+d="(\d+)"[^>]*>([\s\S]*?)<\/p>/g;
   const texts: string[] = [];
   let match;
+
+  const pRegex = /<p\s+t="(\d+)"\s+d="(\d+)"[^>]*>([\s\S]*?)<\/p>/g;
   while ((match = pRegex.exec(xml)) !== null) {
     const inner = match[3];
     let text = "";
@@ -52,7 +57,6 @@ function parseTranscriptXml(xml: string): string {
   }
   if (texts.length > 0) return texts.join(" ");
 
-  // Classic format: <text start="s" dur="s">content</text>
   const classicRegex = /<text start="([^"]*)" dur="([^"]*)">([^<]*)<\/text>/g;
   while ((match = classicRegex.exec(xml)) !== null) {
     const text = decodeEntities(match[3]).trim();
@@ -61,39 +65,153 @@ function parseTranscriptXml(xml: string): string {
   return texts.join(" ");
 }
 
-// Method 1: @distube/ytdl-core (handles YouTube anti-bot measures)
-async function fetchViaYtdlCore(videoId: string): Promise<{ title: string; description: string; transcript: string }> {
-  // Dynamic import to avoid bundling issues
-  const ytdl = (await import("@distube/ytdl-core")).default;
+function parseVtt(vtt: string): string {
+  const lines: string[] = [];
+  for (const line of vtt.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed === "WEBVTT") continue;
+    if (trimmed.startsWith("Kind:") || trimmed.startsWith("Language:")) continue;
+    if (/^\d+$/.test(trimmed)) continue;
+    if (/^\d{2}:\d{2}/.test(trimmed)) continue;
+    if (trimmed.startsWith("NOTE")) continue;
+    if (trimmed.startsWith("STYLE")) continue;
+    lines.push(trimmed);
+  }
+  return [...new Set(lines)].join(" ");
+}
 
-  const info = await ytdl.getInfo(videoId);
-  const tracks = info.player_response?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+function getTitleFromOembed(videoId: string): Promise<string> {
+  return fetchWithTimeout(
+    `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`,
+  )
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => d?.title || "")
+    .catch(() => "");
+}
 
-  if (!Array.isArray(tracks) || tracks.length === 0) {
-    throw new Error("No caption tracks found");
+interface TranscriptResult {
+  title: string;
+  description: string;
+  transcript: string;
+}
+
+// ─── Method 1: youtube-transcript npm package ────────────────────────────────
+// Uses InnerTube Android client + web page scraping with proper token extraction.
+// Most likely to succeed from any IP because it handles YouTube's bot detection tokens.
+async function fetchViaNpmPackage(videoId: string): Promise<TranscriptResult> {
+  const { YoutubeTranscript } = await import("youtube-transcript");
+  const items = await YoutubeTranscript.fetchTranscript(videoId, { lang: "en" });
+  if (!items || items.length === 0) throw new Error("No transcript items returned");
+
+  const transcript = items.map((item: { text: string }) => item.text).join(" ");
+  const title = await getTitleFromOembed(videoId);
+  return { title, description: "", transcript };
+}
+
+// ─── Method 2: yt-dlp CLI ────────────────────────────────────────────────────
+// yt-dlp is the most robust YouTube extractor. Handles PO tokens, cookies, and
+// anti-bot measures that simple HTTP fetchers cannot.
+const YTDLP_PATH = join("/tmp", "yt-dlp");
+
+async function ensureYtDlp(): Promise<string> {
+  if (existsSync(YTDLP_PATH)) return YTDLP_PATH;
+
+  // Download yt-dlp standalone binary (Linux x64 for Vercel, or fallback)
+  const isWin = process.platform === "win32";
+  if (isWin) {
+    // On Windows, try to find yt-dlp.exe in PATH or common locations
+    try {
+      const { stdout } = await execFileAsync("where", ["yt-dlp"]);
+      return stdout.trim().split("\n")[0].trim();
+    } catch {
+      throw new Error("yt-dlp not found on Windows");
+    }
   }
 
-  // Prefer English, fall back to first available
+  const url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp";
+  const resp = await fetchWithTimeout(url, {}, 30000);
+  if (!resp.ok) throw new Error(`Failed to download yt-dlp: ${resp.status}`);
+  const buffer = Buffer.from(await resp.arrayBuffer());
+  writeFileSync(YTDLP_PATH, buffer);
+  chmodSync(YTDLP_PATH, 0o755);
+  return YTDLP_PATH;
+}
+
+async function fetchViaYtDlp(videoId: string): Promise<TranscriptResult> {
+  const ytDlp = await ensureYtDlp();
+  const subFile = join("/tmp", `${videoId}.en.vtt`);
+  const jsonFile = join("/tmp", `${videoId}.info.json`);
+
+  // Clean up any previous files
+  try { unlinkSync(subFile); } catch { /* */ }
+  try { unlinkSync(jsonFile); } catch { /* */ }
+
+  try {
+    const { stdout } = await execFileAsync(ytDlp, [
+      "--write-auto-sub",
+      "--sub-lang", "en",
+      "--sub-format", "vtt",
+      "--skip-download",
+      "--no-warnings",
+      "--print-json",
+      `-o`, join("/tmp", `${videoId}`),
+      `https://www.youtube.com/watch?v=${videoId}`,
+    ], { timeout: 30000 });
+
+    // Parse video info JSON (last line of stdout)
+    const jsonLines = stdout.trim().split("\n");
+    const lastLine = jsonLines[jsonLines.length - 1];
+    let title = "";
+    let description = "";
+    try {
+      const info = JSON.parse(lastLine);
+      title = info?.title || "";
+      description = info?.description || "";
+    } catch { /* */ }
+
+    // If stdout didn't have JSON, try reading the file
+    if (!title && existsSync(jsonFile)) {
+      try {
+        const info = JSON.parse(readFileSync(jsonFile, "utf-8"));
+        title = info?.title || "";
+        description = info?.description || "";
+      } catch { /* */ }
+    }
+
+    // Read and parse the VTT subtitle file
+    if (!existsSync(subFile)) throw new Error("No subtitle file created");
+    const vtt = readFileSync(subFile, "utf-8");
+    const transcript = parseVtt(vtt);
+    if (!transcript) throw new Error("Subtitle file was empty");
+
+    return { title, description, transcript };
+  } finally {
+    try { unlinkSync(subFile); } catch { /* */ }
+    try { unlinkSync(jsonFile); } catch { /* */ }
+  }
+}
+
+// ─── Method 3: @distube/ytdl-core ────────────────────────────────────────────
+async function fetchViaYtdlCore(videoId: string): Promise<TranscriptResult> {
+  const ytdl = (await import("@distube/ytdl-core")).default;
+  const info = await ytdl.getInfo(videoId);
+  const tracks = info.player_response?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+  if (!Array.isArray(tracks) || tracks.length === 0) throw new Error("No caption tracks found");
+
   const track = tracks.find((t: { languageCode: string }) => t.languageCode?.startsWith("en")) || tracks[0];
   if (!track?.baseUrl) throw new Error("No track URL");
 
-  const xmlResp = await fetchWithTimeout(track.baseUrl, {
-    headers: { "User-Agent": CHROME_UA },
-  });
+  const xmlResp = await fetchWithTimeout(track.baseUrl, { headers: { "User-Agent": CHROME_UA } });
   if (!xmlResp.ok) throw new Error(`Caption fetch failed: ${xmlResp.status}`);
-
-  const xml = await xmlResp.text();
-  const transcript = parseTranscriptXml(xml);
+  const transcript = parseTranscriptXml(await xmlResp.text());
 
   const details = info.videoDetails as unknown as Record<string, string>;
-  const title = details?.title || "";
-  const description = details?.short_description || "";
-
-  return { title, description, transcript };
+  return { title: details?.title || "", description: details?.short_description || "", transcript };
 }
 
-// Method 2: InnerTube WEB client
-async function fetchViaInnerTubeWeb(videoId: string): Promise<{ title: string; description: string; transcript: string }> {
+// ─── Method 4: InnerTube WEB client ──────────────────────────────────────────
+async function fetchViaInnerTubeWeb(videoId: string): Promise<TranscriptResult> {
   const resp = await fetchWithTimeout("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
     method: "POST",
     headers: { "Content-Type": "application/json", "User-Agent": CHROME_UA },
@@ -103,10 +221,9 @@ async function fetchViaInnerTubeWeb(videoId: string): Promise<{ title: string; d
     }),
   });
   if (!resp.ok) throw new Error(`InnerTube WEB failed: ${resp.status}`);
-
   const data = await resp.json();
   const tracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
-  if (!Array.isArray(tracks) || tracks.length === 0) throw new Error("No caption tracks in WEB response");
+  if (!Array.isArray(tracks) || tracks.length === 0) throw new Error("No caption tracks");
 
   const track = tracks.find((t: { languageCode: string }) => t.languageCode?.startsWith("en")) || tracks[0];
   if (!track?.baseUrl) throw new Error("No track URL");
@@ -115,14 +232,15 @@ async function fetchViaInnerTubeWeb(videoId: string): Promise<{ title: string; d
   if (!xmlResp.ok) throw new Error(`Caption XML failed: ${xmlResp.status}`);
 
   const transcript = parseTranscriptXml(await xmlResp.text());
-  const title = data?.videoDetails?.title || "";
-  const description = data?.videoDetails?.shortDescription || "";
-
-  return { title, description, transcript };
+  return {
+    title: data?.videoDetails?.title || "",
+    description: data?.videoDetails?.shortDescription || "",
+    transcript,
+  };
 }
 
-// Method 3: oEmbed for details + HTML scrape for captions
-async function fetchViaHtmlScrape(videoId: string): Promise<{ title: string; description: string; transcript: string }> {
+// ─── Method 5: HTML scrape ───────────────────────────────────────────────────
+async function fetchViaHtmlScrape(videoId: string): Promise<TranscriptResult> {
   const res = await fetchWithTimeout(`https://www.youtube.com/watch?v=${videoId}`, {
     headers: {
       "User-Agent": CHROME_UA,
@@ -131,16 +249,13 @@ async function fetchViaHtmlScrape(videoId: string): Promise<{ title: string; des
     },
   });
   if (!res.ok) throw new Error(`HTML fetch failed: ${res.status}`);
-
   const html = await res.text();
   if (html.includes("g-recaptcha")) throw new Error("YouTube requires CAPTCHA");
   if (!html.includes("playabilityStatus")) throw new Error("Video unavailable");
 
-  // Extract title
   const titleMatch = html.match(/<title>(.*?)<\/title>/);
   const title = titleMatch ? titleMatch[1].replace(" - YouTube", "").trim() : "";
 
-  // Extract caption tracks from ytInitialPlayerResponse
   const startToken = "var ytInitialPlayerResponse = ";
   const startIndex = html.indexOf(startToken);
   if (startIndex === -1) throw new Error("No player response found");
@@ -174,15 +289,9 @@ async function fetchViaHtmlScrape(videoId: string): Promise<{ title: string; des
   return { title, description: "", transcript };
 }
 
-// Method 4: oEmbed for details + timedtext list for transcript
-async function fetchViaTimedtext(videoId: string): Promise<{ title: string; description: string; transcript: string }> {
-  // First get title from oEmbed
-  const oembedResp = await fetchWithTimeout(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
-  if (!oembedResp.ok) throw new Error("oEmbed failed");
-  const oembedData = await oembedResp.json();
-  const title = oembedData?.title || "";
-
-  // Try timedtext API directly
+// ─── Method 6: Timedtext API directly ────────────────────────────────────────
+async function fetchViaTimedtext(videoId: string): Promise<TranscriptResult> {
+  const title = await getTitleFromOembed(videoId);
   const langs = ["en", "en-US", "en-GB"];
   for (const lang of langs) {
     try {
@@ -198,10 +307,13 @@ async function fetchViaTimedtext(videoId: string): Promise<{ title: string; desc
   throw new Error("No transcripts from timedtext API");
 }
 
-async function fetchSubtitles(videoId: string): Promise<{ transcript: string; title: string; description: string }> {
+// ─── Orchestration ───────────────────────────────────────────────────────────
+async function fetchSubtitles(videoId: string): Promise<TranscriptResult> {
   const errors: string[] = [];
 
-  const methods: [string, () => Promise<{ title: string; description: string; transcript: string }>][] = [
+  const methods: [string, () => Promise<TranscriptResult>][] = [
+    ["youtube-transcript", () => fetchViaNpmPackage(videoId)],
+    ["yt-dlp", () => fetchViaYtDlp(videoId)],
     ["ytdl-core", () => fetchViaYtdlCore(videoId)],
     ["InnerTube WEB", () => fetchViaInnerTubeWeb(videoId)],
     ["HTML scrape", () => fetchViaHtmlScrape(videoId)],
@@ -216,7 +328,9 @@ async function fetchSubtitles(videoId: string): Promise<{ transcript: string; ti
         return result;
       }
     } catch (e) {
-      errors.push(`${name}: ${e instanceof Error ? e.message : "unknown"}`);
+      const msg = e instanceof Error ? e.message : "unknown";
+      errors.push(`${name}: ${msg}`);
+      console.warn(`[transcript] ${name} failed: ${msg}`);
     }
   }
 
@@ -251,16 +365,7 @@ export async function POST(req: NextRequest) {
     const { transcript, title, description } = await fetchSubtitles(videoId);
 
     if (!transcript) {
-      // Still try to get title for the error response
-      let fallbackTitle = "";
-      try {
-        const oembedResp = await fetchWithTimeout(`https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`);
-        if (oembedResp.ok) {
-          const data = await oembedResp.json();
-          fallbackTitle = data?.title || "";
-        }
-      } catch { /* */ }
-
+      const fallbackTitle = await getTitleFromOembed(videoId);
       return Response.json(
         {
           error: "Could not extract captions. The video may not have captions enabled. Try a different video with subtitles.",
