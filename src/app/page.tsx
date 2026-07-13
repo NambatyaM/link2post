@@ -447,6 +447,9 @@ export default function Home() {
       )}
 
       <main className="flex flex-col items-center justify-center min-h-[100dvh] px-5">
+        <div className="fixed top-4 left-4 z-40">
+          <img src="/corner-logo.png" alt="Link2Post" className="h-8 w-auto" />
+        </div>
         <div className="fixed top-4 right-4 z-40 flex items-center gap-2">
           {session && appState !== "library" && (
             <button
