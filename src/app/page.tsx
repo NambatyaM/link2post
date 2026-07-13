@@ -10,6 +10,8 @@ import ContentCalendar from "@/components/ContentCalendar";
 import AuthScreen from "@/components/AuthScreen";
 
 const TIMEZONE_KEY = "link2post_timezone";
+const TRIAL_KEY = "link2post_trials";
+const TRIAL_LIMIT = 2;
 
 function detectTimezone(): string {
   try {
@@ -28,7 +30,18 @@ function getInitialTimezone(): string {
   return detected;
 }
 
-type AppState = "loading" | "auth" | "input" | "processing" | "calendar";
+function getTrialCount(): number {
+  if (typeof window === "undefined") return 0;
+  return parseInt(localStorage.getItem(TRIAL_KEY) || "0", 10);
+}
+
+function incrementTrialCount(): number {
+  const next = getTrialCount() + 1;
+  localStorage.setItem(TRIAL_KEY, String(next));
+  return next;
+}
+
+type AppState = "input" | "processing" | "calendar";
 
 function getAuthHeaders(session: Session | null): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -74,13 +87,18 @@ function calendarResultFromDb(video: Record<string, unknown>, items: Record<stri
 }
 
 export default function Home() {
-  const [appState, setAppState] = useState<AppState>("loading");
+  const [appState, setAppState] = useState<AppState>("input");
   const [session, setSession] = useState<Session | null>(null);
   const [result, setResult] = useState<LinkedInResult | null>(null);
   const [videoTitle, setVideoTitle] = useState("");
   const [timezone] = useState(getInitialTimezone);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [trialCount, setTrialCount] = useState<number>(() => {
+    if (typeof window === "undefined") return 0;
+    return parseInt(localStorage.getItem(TRIAL_KEY) || "0", 10);
+  });
+  const [showSignupWall, setShowSignupWall] = useState(false);
   const [supabase] = useState(() => getSupabaseBrowser());
 
   const loadActiveCalendar = useCallback(async (sess: Session) => {
@@ -108,8 +126,6 @@ export default function Home() {
       setSession(sess);
       if (sess) {
         loadActiveCalendar(sess);
-      } else {
-        setAppState("auth");
       }
     });
 
@@ -117,15 +133,21 @@ export default function Home() {
       setSession(currentSession);
       if (currentSession) {
         loadActiveCalendar(currentSession);
-      } else {
-        setAppState("auth");
       }
     });
 
     return () => subscription.unsubscribe();
   }, [supabase, loadActiveCalendar]);
 
+  const trialsRemaining = Math.max(0, TRIAL_LIMIT - trialCount);
+  const isTrialExhausted = !session && trialsRemaining <= 0;
+
   const handleGenerate = async (url: string) => {
+    if (isTrialExhausted) {
+      setShowSignupWall(true);
+      return;
+    }
+
     setLoading(true);
     setError("");
     setAppState("processing");
@@ -161,6 +183,11 @@ export default function Home() {
         const genResult = data.result as LinkedInResult;
         setResult(genResult);
         setVideoTitle(transcriptData.title || "YouTube video");
+
+        if (!session) {
+          const newCount = incrementTrialCount();
+          setTrialCount(newCount);
+        }
 
         if (session) {
           try {
@@ -225,49 +252,73 @@ export default function Home() {
     await navigator.clipboard.writeText(lines.join("\n"));
   };
 
-  if (appState === "loading" || appState === "auth") {
-    if (appState === "loading") return null;
-    return <AuthScreen onAuth={() => {}} />;
-  }
+  const handleSignupWallDismiss = () => {
+    setShowSignupWall(false);
+  };
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-[100dvh] px-5">
-      {appState === "input" && (
-        <div className="flex flex-col items-center">
-          <div className="mb-8 text-center">
-            <h1 className="text-xl font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
-              Link2Post
-            </h1>
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              Turn any YouTube video into a week of LinkedIn content.
-            </p>
+    <>
+      {showSignupWall && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "var(--bg-primary)" }}>
+          <div className="w-full max-w-sm mx-4">
+            <AuthScreen
+              onAuth={() => { setShowSignupWall(false); }}
+              onDismiss={handleSignupWallDismiss}
+            />
           </div>
-
-          <YouTubeInput onSubmit={handleGenerate} isLoading={loading} />
-
-          {error && (
-            <p className="text-xs mt-3 max-w-[520px] text-center" style={{ color: "#ef4444" }}>{error}</p>
-          )}
         </div>
       )}
 
-      {appState === "processing" && (
-        <div className="flex flex-col items-center">
-          <ProcessingStages videoTitle={videoTitle} />
-        </div>
-      )}
+      <main className="flex flex-col items-center justify-center min-h-[100dvh] px-5">
+        {appState === "input" && (
+          <div className="flex flex-col items-center">
+            <div className="mb-8 text-center">
+              <h1 className="text-xl font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
+                Link2Post
+              </h1>
+              <p className="text-sm" style={{ color: "var(--text-muted)" }}>
+                Turn any YouTube video into a week of LinkedIn content.
+              </p>
+            </div>
 
-      {appState === "calendar" && result && (
-        <ContentCalendar
-          result={result}
-          timezone={timezone}
-          videoTitle={videoTitle}
-          session={session}
-          onRegenerate={handleRegenerate}
-          onCopyAll={handleCopyAll}
-          onNewVideo={() => { setAppState("input"); setResult(null); setVideoTitle(""); }}
-        />
-      )}
-    </main>
+            <YouTubeInput onSubmit={handleGenerate} isLoading={loading} />
+
+            {!session && trialsRemaining > 0 && trialsRemaining < TRIAL_LIMIT && (
+              <p className="text-[11px] mt-3" style={{ color: "var(--text-muted)" }}>
+                {trialsRemaining} free {trialsRemaining === 1 ? "generation" : "generations"} remaining
+              </p>
+            )}
+
+            {!session && trialsRemaining === 1 && (
+              <p className="text-[11px] mt-3" style={{ color: "var(--text-muted)" }}>
+                1 free generation remaining — sign up to keep your calendars
+              </p>
+            )}
+
+            {error && (
+              <p className="text-xs mt-3 max-w-[520px] text-center" style={{ color: "#ef4444" }}>{error}</p>
+            )}
+          </div>
+        )}
+
+        {appState === "processing" && (
+          <div className="flex flex-col items-center">
+            <ProcessingStages videoTitle={videoTitle} />
+          </div>
+        )}
+
+        {appState === "calendar" && result && (
+          <ContentCalendar
+            result={result}
+            timezone={timezone}
+            videoTitle={videoTitle}
+            session={session}
+            onRegenerate={handleRegenerate}
+            onCopyAll={handleCopyAll}
+            onNewVideo={() => { setAppState("input"); setResult(null); setVideoTitle(""); }}
+          />
+        )}
+      </main>
+    </>
   );
 }
