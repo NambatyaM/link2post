@@ -169,6 +169,10 @@ export default function Home() {
   const [script, setScript] = useState<VideoScript | null>(null);
   const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[] | null>(null);
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
+  const [showPasteModal, setShowPasteModal] = useState(false);
+  const [pasteTranscript, setPasteTranscript] = useState("");
+  const [pendingVideoTitle, setPendingVideoTitle] = useState("");
+  const [pendingVideoUrl, setPendingVideoUrl] = useState("");
   const abortRef = useRef(false);
 
   useEffect(() => {
@@ -273,7 +277,18 @@ export default function Home() {
         body: JSON.stringify({ url }),
       });
       const transcriptData = await transcriptRes.json();
-      if (!transcriptRes.ok) throw new Error(transcriptData.error || "Failed to fetch transcript");
+      if (!transcriptRes.ok) {
+        if (transcriptData.canPasteTranscript) {
+          setPendingVideoTitle(transcriptData.title || "");
+          setPendingVideoUrl(url);
+          setPasteTranscript("");
+          setShowPasteModal(true);
+          setLoading(false);
+          setAppState("input");
+          return;
+        }
+        throw new Error(transcriptData.error || "Failed to fetch transcript");
+      }
       if (abortRef.current) return;
 
       setVideoTitle(transcriptData.title || "YouTube video");
@@ -324,6 +339,83 @@ export default function Home() {
               }),
             });
           } catch { /* save failed, calendar still shows in-memory */ }
+        }
+
+        setTimeout(() => setAppState("calendar"), 400);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setAppState("input");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleManualGenerate = async () => {
+    if (!pasteTranscript.trim()) return;
+    setShowPasteModal(false);
+    setLoading(true);
+    setError("");
+    setProcessingStage("generating");
+    setAppState("processing");
+    abortRef.current = false;
+
+    const transcriptData: VideoInfo = {
+      title: pendingVideoTitle || "YouTube video",
+      description: "",
+      transcript: pasteTranscript.trim(),
+      url: pendingVideoUrl,
+      videoId: "",
+    };
+
+    try {
+      setVideoTitle(transcriptData.title);
+      setVideoInfo(transcriptData);
+
+      const generateRes = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          videoInfo: transcriptData,
+          timezone,
+          audience: "LinkedIn professionals",
+          provider: selectedModel?.providerId,
+          model: selectedModel?.modelId,
+          stream: false,
+        }),
+      });
+
+      if (!generateRes.ok) {
+        const errData = await generateRes.json();
+        throw new Error(errData.error || "Generation failed");
+      }
+
+      const data = await generateRes.json();
+      if (data.result) {
+        const genResult = data.result as LinkedInResult;
+        setResult(genResult);
+        setVideoTitle(transcriptData.title);
+        setProcessingStage("done");
+
+        if (!session) {
+          const newCount = incrementTrialCount();
+          setTrialCount(newCount);
+        }
+
+        if (session) {
+          try {
+            await fetch("/api/calendar/save", {
+              method: "POST",
+              headers: getAuthHeaders(session),
+              body: JSON.stringify({
+                videoUrl: pendingVideoUrl,
+                videoTitle: transcriptData.title,
+                videoId: "",
+                transcript: pasteTranscript.trim(),
+                result: genResult,
+              }),
+            });
+          } catch { /* save failed */ }
         }
 
         setTimeout(() => setAppState("calendar"), 400);
@@ -444,6 +536,51 @@ export default function Home() {
               onAuth={() => { setShowSignupWall(false); }}
               onDismiss={handleSignupWallDismiss}
             />
+          </div>
+        </div>
+      )}
+
+      {showPasteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
+          <div className="w-full max-w-lg mx-4 rounded-2xl p-6" style={{ background: "var(--bg-primary)", border: "1px solid var(--border)" }}>
+            <h2 className="text-lg font-bold mb-1" style={{ color: "var(--text-primary)" }}>Paste Transcript Manually</h2>
+            <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
+              YouTube blocked automatic extraction. Open the video, click <strong>⋯</strong> below the video, select <strong>Show transcript</strong>, copy all the text, and paste it here.
+            </p>
+            {pendingVideoTitle && (
+              <p className="text-xs mb-2 font-medium" style={{ color: "var(--text-primary)" }}>{pendingVideoTitle}</p>
+            )}
+            <textarea
+              value={pasteTranscript}
+              onChange={(e) => setPasteTranscript(e.target.value)}
+              placeholder="Paste the transcript text here..."
+              className="w-full h-48 p-3 rounded-xl text-sm resize-none focus:outline-none focus:ring-2"
+              style={{
+                background: "var(--bg-secondary)",
+                color: "var(--text-primary)",
+                border: "1px solid var(--border)",
+              }}
+            />
+            <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>
+              {pasteTranscript.length > 0 ? `${pasteTranscript.length.toLocaleString()} characters` : "No text yet"}
+            </p>
+            <div className="flex gap-2 mt-4 justify-end">
+              <button
+                onClick={() => { setShowPasteModal(false); setPasteTranscript(""); }}
+                className="px-4 py-2 rounded-lg text-sm transition-colors"
+                style={{ border: "1px solid var(--border)", color: "var(--text-muted)" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleManualGenerate}
+                disabled={!pasteTranscript.trim()}
+                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40"
+                style={{ background: "var(--accent)", color: "white" }}
+              >
+                Generate from Transcript
+              </button>
+            </div>
           </div>
         </div>
       )}

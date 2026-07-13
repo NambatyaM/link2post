@@ -192,7 +192,61 @@ async function fetchViaYtDlp(videoId: string): Promise<TranscriptResult> {
   }
 }
 
-// ─── Method 3: @distube/ytdl-core ────────────────────────────────────────────
+// ─── Method 3: InnerTube ANDROID + CORS proxy for caption XML ────────────────
+// Key insight: InnerTube /player endpoint works from Vercel (returns signed URLs),
+// but api/timedtext is IP-blocked. So we get the URL server-side, then fetch the
+// actual caption XML through a proxy service that has different IPs.
+async function fetchViaInnerTubeAndProxy(videoId: string): Promise<TranscriptResult> {
+  // Step 1: Get signed caption track URLs via InnerTube ANDROID client
+  const resp = await fetchWithTimeout("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "User-Agent": "com.google.android.youtube/19.09.37 (Linux; U; Android 14; en_US)",
+    },
+    body: JSON.stringify({
+      context: { client: { clientName: "ANDROID", clientVersion: "19.09.37", hl: "en", gl: "US" } },
+      videoId,
+    }),
+  });
+  if (!resp.ok) throw new Error(`InnerTube ANDROID failed: ${resp.status}`);
+  const data = await resp.json();
+  const tracks = data?.captions?.playerCaptionsTracklistRenderer?.captionTracks;
+  if (!Array.isArray(tracks) || tracks.length === 0) throw new Error("No caption tracks in ANDROID response");
+
+  const track = tracks.find((t: { languageCode: string }) => t.languageCode?.startsWith("en")) || tracks[0];
+  if (!track?.baseUrl) throw new Error("No track URL");
+
+  const title = data?.videoDetails?.title || "";
+  const description = data?.videoDetails?.shortDescription || "";
+
+  // Step 2: Fetch caption XML through CORS proxy services
+  // These services proxy the request from their own IPs, which may not be blocked
+  const captionUrl = track.baseUrl + "&fmt=srv3";
+  const proxies = [
+    (url: string) => `https://corsproxy.io/?${encodeURIComponent(url)}`,
+    (url: string) => `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+    (url: string) => `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+  ];
+
+  for (const proxyFn of proxies) {
+    try {
+      const proxyUrl = proxyFn(captionUrl);
+      const xmlResp = await fetchWithTimeout(proxyUrl, {
+        headers: { "User-Agent": CHROME_UA },
+      }, 20000);
+      if (!xmlResp.ok) continue;
+      const xml = await xmlResp.text();
+      if (!xml || xml.length < 50) continue;
+      const transcript = parseTranscriptXml(xml);
+      if (transcript && transcript.length > 10) return { title, description, transcript };
+    } catch { /* try next proxy */ }
+  }
+
+  throw new Error("All proxy fetches failed");
+}
+
+// ─── Method 4: @distube/ytdl-core ────────────────────────────────────────────
 async function fetchViaYtdlCore(videoId: string): Promise<TranscriptResult> {
   const ytdl = (await import("@distube/ytdl-core")).default;
   const info = await ytdl.getInfo(videoId);
@@ -210,7 +264,7 @@ async function fetchViaYtdlCore(videoId: string): Promise<TranscriptResult> {
   return { title: details?.title || "", description: details?.short_description || "", transcript };
 }
 
-// ─── Method 4: InnerTube WEB client ──────────────────────────────────────────
+// ─── Method 5: InnerTube WEB client ──────────────────────────────────────────
 async function fetchViaInnerTubeWeb(videoId: string): Promise<TranscriptResult> {
   const resp = await fetchWithTimeout("https://www.youtube.com/youtubei/v1/player?prettyPrint=false", {
     method: "POST",
@@ -239,7 +293,7 @@ async function fetchViaInnerTubeWeb(videoId: string): Promise<TranscriptResult> 
   };
 }
 
-// ─── Method 5: HTML scrape ───────────────────────────────────────────────────
+// ─── Method 6: HTML scrape ───────────────────────────────────────────────────
 async function fetchViaHtmlScrape(videoId: string): Promise<TranscriptResult> {
   const res = await fetchWithTimeout(`https://www.youtube.com/watch?v=${videoId}`, {
     headers: {
@@ -314,6 +368,7 @@ async function fetchSubtitles(videoId: string): Promise<TranscriptResult> {
   const methods: [string, () => Promise<TranscriptResult>][] = [
     ["youtube-transcript", () => fetchViaNpmPackage(videoId)],
     ["yt-dlp", () => fetchViaYtDlp(videoId)],
+    ["InnerTube ANDROID+proxy", () => fetchViaInnerTubeAndProxy(videoId)],
     ["ytdl-core", () => fetchViaYtdlCore(videoId)],
     ["InnerTube WEB", () => fetchViaInnerTubeWeb(videoId)],
     ["HTML scrape", () => fetchViaHtmlScrape(videoId)],
@@ -368,9 +423,10 @@ export async function POST(req: NextRequest) {
       const fallbackTitle = await getTitleFromOembed(videoId);
       return Response.json(
         {
-          error: "Could not extract captions. The video may not have captions enabled. Try a different video with subtitles.",
+          error: "Could not extract captions. YouTube may be temporarily blocking transcript requests. You can paste the transcript manually — open the YouTube video, click the three dots (...) below the video, select 'Show transcript', copy the text, and paste it below.",
           title: fallbackTitle,
           description: "",
+          canPasteTranscript: true,
         },
         { status: 422 },
       );
