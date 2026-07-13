@@ -69,9 +69,7 @@ export default function ContentCalendar({
     <div className="w-full max-w-[768px] mx-auto">
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="shrink-0 w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: "rgba(255,0,0,0.1)" }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ff0000" strokeWidth="2"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-          </div>
+          <img src="/logo.png" alt="Link2Post" className="shrink-0 w-10 h-10 rounded-lg object-cover" />
           <div className="min-w-0">
             <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{videoTitle}</p>
             <p className="text-[11px] truncate" style={{ color: "var(--text-muted)" }}>
