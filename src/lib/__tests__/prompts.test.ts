@@ -110,7 +110,7 @@ describe("prompts", () => {
   });
 
   it("CAROUSEL_SYSTEM_PROMPT contains required fields", () => {
-    expect(CAROUSEL_SYSTEM_PROMPT).toContain("10-slide");
+    expect(CAROUSEL_SYSTEM_PROMPT).toContain("6-10 slides");
     expect(CAROUSEL_SYSTEM_PROMPT).toContain("slideNumber");
     expect(CAROUSEL_SYSTEM_PROMPT).toContain("title");
     expect(CAROUSEL_SYSTEM_PROMPT).toContain("body");
@@ -125,9 +125,8 @@ describe("prompts", () => {
     expect(result).toContain("My Video");
     expect(result).toContain("Description text");
     expect(result).toContain("Video transcript");
-    expect(result).toContain("10-SLIDE");
+    expect(result).toContain("6-10 slides");
     expect(result).toContain("Slide 1");
-    expect(result).toContain("Slide 10");
   });
 
   it("buildCarouselPrompt includes slide structure rules", () => {
@@ -136,7 +135,7 @@ describe("prompts", () => {
     );
     expect(result).toContain("max 8 words");
     expect(result).toContain("max 30 words");
-    expect(result).toContain("standalone");
+    expect(result).toContain("stands alone");
   });
 
   it("buildVideoScriptPrompt includes style rules", () => {

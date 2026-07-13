@@ -5,16 +5,16 @@ export default function SlideRenderer({
   slide,
   template,
   format,
+  totalSlides = 10,
 }: {
   slide: CarouselSlide;
   template: CarouselTemplate;
   format: CarouselFormat;
+  totalSlides?: number;
 }) {
   const c = template.colors;
   const isFirst = slide.slideNumber === 1;
-  const isLast = slide.slideNumber === 10;
-  const totalSlides = 10;
-  const isLight = template.id === "minimal";
+  const isLast = slide.slideNumber === totalSlides;
 
   return (
     <div
@@ -57,7 +57,7 @@ export default function SlideRenderer({
             top: `${format.width * 0.037}px`,
             right: `${format.width * 0.037}px`,
             fontSize: `${format.width * 0.011}px`,
-            color: isLight ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.25)",
+            color: `${c.title}40`,
           }}
         >
           Swipe to read →
@@ -80,19 +80,22 @@ export default function SlideRenderer({
         {slide.title}
       </h2>
 
-      {/* Body */}
-      <p
+      {/* Body — scrollable if overflows */}
+      <div
         style={{
           fontSize: `${format.width * 0.022}px`,
           color: c.body,
           textAlign: "center" as const,
           lineHeight: 1.6,
           maxWidth: `${format.width * 0.69}px`,
+          maxHeight: `${format.height * 0.55}px`,
+          overflow: "auto",
           wordBreak: "break-word" as const,
+          padding: "2px",
         }}
       >
         {slide.body}
-      </p>
+      </div>
 
       {/* CTA button on last slide */}
       {isLast && (

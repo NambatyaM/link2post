@@ -18,20 +18,20 @@
 }
 
 .light {
-  --bg-primary: #ffffff;
-  --bg-secondary: #f7f7f8;
-  --bg-tertiary: #ececec;
+  --bg-primary: #fafaf9;
+  --bg-secondary: #f5f5f4;
+  --bg-tertiary: #e7e5e4;
   --bg-input: #ffffff;
-  --bg-hover: #f0f0f0;
-  --bg-user-msg: #f7f7f8;
+  --bg-hover: #eef0ed;
+  --bg-user-msg: #f0f4f1;
   --accent: #10a37f;
   --accent-hover: #0e8c6b;
-  --text-primary: #171717;
-  --text-secondary: #525252;
-  --text-muted: #a3a3a3;
-  --border: #e5e5e5;
-  --border-light: #f0f0f0;
-  --scrollbar-thumb: #d4d4d4;
+  --text-primary: #1c1917;
+  --text-secondary: #57534e;
+  --text-muted: #a8a29e;
+  --border: #d6d3d1;
+  --border-light: #e7e5e4;
+  --scrollbar-thumb: #c8c5c0;
 }
 
 * {

@@ -9,9 +9,10 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Link2Post — Turn any YouTube video into a week of LinkedIn content",
+  title: "Link2Post — Paste a transcript, get a week of LinkedIn content",
   description:
-    "Paste a YouTube link and get a full week of LinkedIn posts, articles, and image prompts — ready to copy and publish.",
+    "Paste any transcript and get LinkedIn posts, articles, carousels, video scripts, and a content calendar — ready to publish.",
+  icons: { icon: "/favicon.svg" },
 };
 
 export default function RootLayout({

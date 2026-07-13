@@ -509,7 +509,7 @@ export default function Home() {
 
             <div className="mt-10 w-full">
               <p className="text-[11px] text-center mb-4" style={{ color: "var(--text-muted)" }}>
-                What you get from one YouTube link:
+                What you get from one transcript:
               </p>
               <div className="grid grid-cols-3 gap-3">
                 {[
