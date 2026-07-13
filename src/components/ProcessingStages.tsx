@@ -3,8 +3,7 @@
 import { useMemo } from "react";
 
 const STAGES = [
-  { label: "Reading your video", icon: "video" },
-  { label: "Finding the best moments", icon: "search" },
+  { label: "Analyzing your content", icon: "search" },
   { label: "Writing your posts", icon: "write" },
   { label: "Building your calendar", icon: "calendar" },
 ] as const;
@@ -20,12 +19,6 @@ function StageIcon({ type, done }: { type: string; done: boolean }) {
 
   const color = "var(--text-muted)";
   switch (type) {
-    case "video":
-      return (
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
-          <polygon points="5 3 19 12 5 21 5 3" />
-        </svg>
-      );
     case "search":
       return (
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round">
@@ -50,11 +43,10 @@ function StageIcon({ type, done }: { type: string; done: boolean }) {
   }
 }
 
-export default function ProcessingStages({ videoTitle, stage }: { videoTitle?: string; stage?: "transcript" | "generating" | "done" }) {
+export default function ProcessingStages({ videoTitle, stage }: { videoTitle?: string; stage?: "generating" | "done" }) {
   const completedStages = useMemo(() => {
-    if (stage === "transcript") return [0];
-    if (stage === "generating") return [0, 1, 2];
-    if (stage === "done") return [0, 1, 2, 3];
+    if (stage === "generating") return [0, 1];
+    if (stage === "done") return [0, 1, 2];
     return [];
   }, [stage]);
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Session } from "@supabase/supabase-js";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import type { LinkedInResult, LinkedInPost, LinkedInArticle, VideoScript, VideoInfo, CarouselSlide } from "@/lib/types";
-import YouTubeInput from "@/components/YouTubeInput";
+import TranscriptInput from "@/components/TranscriptInput";
 import ProcessingStages from "@/components/ProcessingStages";
 import ContentCalendar from "@/components/ContentCalendar";
 import AuthScreen from "@/components/AuthScreen";
@@ -54,7 +54,7 @@ function incrementTrialCount(): number {
 }
 
 type AppState = "input" | "processing" | "calendar" | "library";
-type ProcessingStage = "transcript" | "generating" | "done";
+type ProcessingStage = "generating" | "done";
 
 function getAuthHeaders(session: Session | null): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -165,14 +165,10 @@ export default function Home() {
   const [supabase] = useState(() => getSupabaseBrowser());
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
   const [selectedModel, setSelectedModel] = useState<{ providerId: string; modelId: string } | null>(null);
-  const [processingStage, setProcessingStage] = useState<ProcessingStage>("transcript");
+  const [processingStage, setProcessingStage] = useState<ProcessingStage>("generating");
   const [script, setScript] = useState<VideoScript | null>(null);
   const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[] | null>(null);
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
-  const [showPasteModal, setShowPasteModal] = useState(false);
-  const [pasteTranscript, setPasteTranscript] = useState("");
-  const [pendingVideoTitle, setPendingVideoTitle] = useState("");
-  const [pendingVideoUrl, setPendingVideoUrl] = useState("");
   const abortRef = useRef(false);
 
   useEffect(() => {
@@ -258,7 +254,7 @@ export default function Home() {
   const trialsRemaining = Math.max(0, TRIAL_LIMIT - trialCount);
   const isTrialExhausted = !session && trialsRemaining <= 0;
 
-  const handleGenerate = async (url: string) => {
+  const handleGenerate = async (title: string, transcript: string) => {
     if (isTrialExhausted) {
       setShowSignupWall(true);
       return;
@@ -266,110 +262,20 @@ export default function Home() {
 
     setLoading(true);
     setError("");
-    setProcessingStage("transcript");
-    setAppState("processing");
-    abortRef.current = false;
-
-    try {
-      const transcriptRes = await fetch("/api/transcript", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ url }),
-      });
-      const transcriptData = await transcriptRes.json();
-      if (!transcriptRes.ok) {
-        if (transcriptData.canPasteTranscript) {
-          setPendingVideoTitle(transcriptData.title || "");
-          setPendingVideoUrl(url);
-          setPasteTranscript("");
-          setShowPasteModal(true);
-          setLoading(false);
-          setAppState("input");
-          return;
-        }
-        throw new Error(transcriptData.error || "Failed to fetch transcript");
-      }
-      if (abortRef.current) return;
-
-      setVideoTitle(transcriptData.title || "YouTube video");
-      setVideoInfo(transcriptData);
-      setProcessingStage("generating");
-
-      const generateRes = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          videoInfo: transcriptData,
-          timezone,
-          audience: "LinkedIn professionals",
-          provider: selectedModel?.providerId,
-          model: selectedModel?.modelId,
-          stream: false,
-        }),
-      });
-
-      if (!generateRes.ok) {
-        const errData = await generateRes.json();
-        throw new Error(errData.error || "Generation failed");
-      }
-
-      const data = await generateRes.json();
-      if (data.result) {
-        const genResult = data.result as LinkedInResult;
-        setResult(genResult);
-        setVideoTitle(transcriptData.title || "YouTube video");
-        setProcessingStage("done");
-
-        if (!session) {
-          const newCount = incrementTrialCount();
-          setTrialCount(newCount);
-        }
-
-        if (session) {
-          try {
-            await fetch("/api/calendar/save", {
-              method: "POST",
-              headers: getAuthHeaders(session),
-              body: JSON.stringify({
-                videoUrl: url,
-                videoTitle: transcriptData.title,
-                videoId: transcriptData.videoId,
-                transcript: transcriptData.transcript,
-                result: genResult,
-              }),
-            });
-          } catch { /* save failed, calendar still shows in-memory */ }
-        }
-
-        setTimeout(() => setAppState("calendar"), 400);
-      }
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Something went wrong");
-      setAppState("input");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleManualGenerate = async () => {
-    if (!pasteTranscript.trim()) return;
-    setShowPasteModal(false);
-    setLoading(true);
-    setError("");
     setProcessingStage("generating");
     setAppState("processing");
     abortRef.current = false;
 
     const transcriptData: VideoInfo = {
-      title: pendingVideoTitle || "YouTube video",
+      title,
       description: "",
-      transcript: pasteTranscript.trim(),
-      url: pendingVideoUrl,
+      transcript,
+      url: "",
       videoId: "",
     };
 
     try {
-      setVideoTitle(transcriptData.title);
+      setVideoTitle(title);
       setVideoInfo(transcriptData);
 
       const generateRes = await fetch("/api/generate", {
@@ -394,7 +300,7 @@ export default function Home() {
       if (data.result) {
         const genResult = data.result as LinkedInResult;
         setResult(genResult);
-        setVideoTitle(transcriptData.title);
+        setVideoTitle(title);
         setProcessingStage("done");
 
         if (!session) {
@@ -408,14 +314,14 @@ export default function Home() {
               method: "POST",
               headers: getAuthHeaders(session),
               body: JSON.stringify({
-                videoUrl: pendingVideoUrl,
-                videoTitle: transcriptData.title,
+                videoUrl: "",
+                videoTitle: title,
                 videoId: "",
-                transcript: pasteTranscript.trim(),
+                transcript,
                 result: genResult,
               }),
             });
-          } catch { /* save failed */ }
+          } catch { /* save failed, calendar still shows in-memory */ }
         }
 
         setTimeout(() => setAppState("calendar"), 400);
@@ -540,51 +446,6 @@ export default function Home() {
         </div>
       )}
 
-      {showPasteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <div className="w-full max-w-lg mx-4 rounded-2xl p-6" style={{ background: "var(--bg-primary)", border: "1px solid var(--border)" }}>
-            <h2 className="text-lg font-bold mb-1" style={{ color: "var(--text-primary)" }}>Paste Transcript Manually</h2>
-            <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
-              YouTube blocked automatic extraction. Open the video, click <strong>⋯</strong> below the video, select <strong>Show transcript</strong>, copy all the text, and paste it here.
-            </p>
-            {pendingVideoTitle && (
-              <p className="text-xs mb-2 font-medium" style={{ color: "var(--text-primary)" }}>{pendingVideoTitle}</p>
-            )}
-            <textarea
-              value={pasteTranscript}
-              onChange={(e) => setPasteTranscript(e.target.value)}
-              placeholder="Paste the transcript text here..."
-              className="w-full h-48 p-3 rounded-xl text-sm resize-none focus:outline-none focus:ring-2"
-              style={{
-                background: "var(--bg-secondary)",
-                color: "var(--text-primary)",
-                border: "1px solid var(--border)",
-              }}
-            />
-            <p className="text-[10px] mt-1" style={{ color: "var(--text-muted)" }}>
-              {pasteTranscript.length > 0 ? `${pasteTranscript.length.toLocaleString()} characters` : "No text yet"}
-            </p>
-            <div className="flex gap-2 mt-4 justify-end">
-              <button
-                onClick={() => { setShowPasteModal(false); setPasteTranscript(""); }}
-                className="px-4 py-2 rounded-lg text-sm transition-colors"
-                style={{ border: "1px solid var(--border)", color: "var(--text-muted)" }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleManualGenerate}
-                disabled={!pasteTranscript.trim()}
-                className="px-4 py-2 rounded-lg text-sm font-medium transition-colors disabled:opacity-40"
-                style={{ background: "var(--accent)", color: "white" }}
-              >
-                Generate from Transcript
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       <main className="flex flex-col items-center justify-center min-h-[100dvh] px-5">
         <div className="fixed top-4 right-4 z-40 flex items-center gap-2">
           {session && appState !== "library" && (
@@ -614,11 +475,11 @@ export default function Home() {
                 Link2Post
               </h1>
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-                Turn any YouTube video into a week of LinkedIn content.
+                Paste a transcript, get a week of LinkedIn content.
               </p>
             </div>
 
-            <YouTubeInput onSubmit={handleGenerate} isLoading={loading} />
+            <TranscriptInput onSubmit={handleGenerate} isLoading={loading} />
 
             {modelOptions.length > 1 && (
               <div className="mt-3">

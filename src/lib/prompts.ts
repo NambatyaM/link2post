@@ -33,25 +33,29 @@ Return ONLY valid JSON with this structure:
   "platformNotes": "Works for Reels, TikTok, YouTube Shorts"
 }`;
 
-export const CAROUSEL_SYSTEM_PROMPT = `You are a carousel content strategist. You transform YouTube video transcripts into a 10-slide LinkedIn carousel.
+export const CAROUSEL_SYSTEM_PROMPT = `You are an expert LinkedIn carousel content strategist. You transform transcripts into 10-slide LinkedIn carousels that get saves, shares, and comments.
 
-RULES:
-1. Extract 10 key takeaways from the transcript
-2. First slide = hook/title slide that stops the scroll
-3. Last slide = CTA/follow slide
-4. Middle slides = one takeaway per slide
-5. Write concise: title max 8 words, body max 30 words per slide
-6. Each slide should be standalone — understandable without seeing other slides
-7. Use numbers, bullet points, or short paragraphs for readability
+Your carousels are built on SPECIFIC insights from the source material — never generic advice. Each slide teaches ONE thing clearly.
 
-Return ONLY valid JSON with this structure:
+SLIDE RULES:
+1. Slide 1 (Hook): A bold, curiosity-driven title that stops the scroll. Use a number, a contrarian claim, or a sharp question. Body adds context.
+2. Slides 2-9 (Content): One specific takeaway per slide. Title = the key point (max 8 words). Body = the explanation with a concrete example, number, or story from the transcript (max 30 words).
+3. Slide 10 (CTA): A clear call to action — save, follow, share, or comment.
+
+WRITING STYLE:
+- Use short, punchy sentences
+- Include specific numbers, percentages, or examples from the transcript
+- Every slide must make sense on its own (people screenshot individual slides)
+- No filler words, no corporate jargon, no vague statements
+
+Return ONLY valid JSON:
 {
   "slides": [
     {
       "slideNumber": 1,
-      "title": "Slide title (max 8 words)",
-      "body": "Slide body text (max 30 words)",
-      "notes": "Design notes for this slide"
+      "title": "Hook title (max 8 words)",
+      "body": "Supporting text (max 30 words)",
+      "notes": "Brief design suggestion"
     }
   ]
 }`;
@@ -347,32 +351,31 @@ Return the complete JSON response now.`;
 }
 
 export function buildCarouselPrompt(videoInfo: VideoInfo): string {
-  return `CREATE A 10-SLIDE LINKEDIN CAROUSEL FROM THIS VIDEO:
+  return `CREATE A 10-SLIDE LINKEDIN CAROUSEL FROM THIS CONTENT:
 
----VIDEO TITLE---
+---TITLE---
 ${videoInfo.title}
 
----VIDEO DESCRIPTION---
-${videoInfo.description.slice(0, 500)}
+---DESCRIPTION---
+${videoInfo.description ? videoInfo.description.slice(0, 500) : "(none)"}
 
----VIDEO TRANSCRIPT---
+---TRANSCRIPT / CONTENT---
 ${videoInfo.transcript.slice(0, 15000)}
 
 ---INSTRUCTIONS---
 
-Extract 10 key takeaways from this video and create a 10-slide LinkedIn carousel.
+Extract the 10 most impactful, specific insights from the transcript above. Create a carousel where each slide teaches ONE thing clearly.
 
 SLIDE STRUCTURE:
-- Slide 1 (Hook): Bold title that stops the scroll. This is the cover slide.
-- Slides 2-9 (Content): One key takeaway per slide. Use numbers, bullet points, or short paragraphs.
-- Slide 10 (CTA): Call to action — follow, save, comment, or visit link.
+- Slide 1 (Hook): Bold title that stops the scroll. Use a number, contrarian claim, or sharp question from the transcript.
+- Slides 2-9 (Content): One key takeaway per slide with a concrete example, number, or story.
+- Slide 10 (CTA): Call to action — save, follow, share, or comment.
 
-RULES:
-- Title: max 8 words per slide
-- Body: max 30 words per slide
-- Each slide should be standalone (understandable without seeing others)
-- Use specific details, numbers, and examples from the transcript
-- No generic advice — every slide should have a concrete insight
+QUALITY CHECKLIST:
+- Every slide has a SPECIFIC detail from the transcript (not generic advice)
+- Titles are max 8 words, bodies max 30 words
+- Each slide stands alone (people screenshot individual slides)
+- No filler, no corporate jargon
 
-Return the complete JSON response now.`;
+Return the complete JSON now.`;
 }

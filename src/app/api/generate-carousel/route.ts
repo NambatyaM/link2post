@@ -10,38 +10,33 @@ function parseCarouselResponse(raw: string): CarouselSlide[] | null {
   if (cleaned.startsWith("```")) {
     cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
   }
+
+  function sanitize(slides: Record<string, unknown>[]): CarouselSlide[] | null {
+    if (!Array.isArray(slides) || slides.length < 5) return null;
+    return slides.map((s: Record<string, unknown>, i: number) => ({
+      slideNumber: (s.slideNumber as number) || i + 1,
+      title: String(s.title || "").slice(0, 100),
+      body: String(s.body || "").slice(0, 500),
+      notes: String(s.notes || ""),
+    }));
+  }
+
   try {
     const parsed = JSON.parse(cleaned);
-    if (parsed.slides && Array.isArray(parsed.slides) && parsed.slides.length >= 5) {
-      return parsed.slides as CarouselSlide[];
-    }
+    const result = sanitize(parsed.slides);
+    if (result) return result;
   } catch { /* */ }
+
   const jsonStart = cleaned.indexOf("{");
   const jsonEnd = cleaned.lastIndexOf("}");
   if (jsonStart !== -1 && jsonEnd > jsonStart) {
     try {
       const parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
-      if (parsed.slides && Array.isArray(parsed.slides) && parsed.slides.length >= 5) {
-        return parsed.slides as CarouselSlide[];
-      }
+      const result = sanitize(parsed.slides);
+      if (result) return result;
     } catch { /* */ }
   }
   return null;
-}
-
-function generateMockCarousel(): CarouselSlide[] {
-  return [
-    { slideNumber: 1, title: "Stop Posting at the Wrong Time", body: "The data reveals a completely different optimal schedule for LinkedIn.", notes: "Bold title, dark background" },
-    { slideNumber: 2, title: "The 10 AM Rule", body: "Professionals clear their inbox by 9:30. They take their first scroll break at 10 AM.", notes: "Clock visual" },
-    { slideNumber: 3, title: "Wednesday Wins", body: "Wednesday at 4 PM outperforms every other time slot. The end-of-day scroll is real.", notes: "Calendar highlight" },
-    { slideNumber: 4, title: "Character Count Matters", body: "1,000-1,300 characters is the sweet spot. Not words. Characters.", notes: "Number emphasis" },
-    { slideNumber: 5, title: "Completion Rate > Word Count", body: "100% of 800 chars beats 30% of 3,000 chars. The algorithm rewards finishers.", notes: "Comparison visual" },
-    { slideNumber: 6, title: "The Hook Contract", body: "Your first line is a promise. Either deliver on it or lose trust.", notes: "Magnifying glass" },
-    { slideNumber: 7, title: "Specificity Wins", body: "'We fired our top performer. Revenue went up 40%.' beats 'Leadership is hard.'", notes: "Before/after" },
-    { slideNumber: 8, title: "The 3-Post Framework", body: "Tuesday: insight. Wednesday: strongest piece. Thursday: takeaway. Done.", notes: "Framework visual" },
-    { slideNumber: 9, title: "Consistency Compounds", body: "One viral post won't build your presence. 3 posts per week for 6 months will.", notes: "Growth curve" },
-    { slideNumber: 10, title: "Save This for Later", body: "Follow for more data-backed content strategies. Share with someone who needs this.", notes: "CTA slide, bold" },
-  ];
 }
 
 export async function POST(req: NextRequest) {
@@ -53,7 +48,7 @@ export async function POST(req: NextRequest) {
     };
 
     if (!videoInfo?.transcript || videoInfo.transcript.length < 100) {
-      return Response.json({ error: "Video transcript is too short or missing." }, { status: 400 });
+      return Response.json({ error: "Transcript is too short or missing." }, { status: 400 });
     }
 
     let userId: string | undefined;
@@ -79,7 +74,10 @@ export async function POST(req: NextRequest) {
 
     const resolved = resolveProviderAndModel(providerId, modelId);
     if (!resolved) {
-      return Response.json({ slides: generateMockCarousel() }, { headers: getRateLimitHeaders(rateResult) });
+      return Response.json(
+        { error: "No AI provider available. Please configure an API key." },
+        { status: 503, headers: getRateLimitHeaders(rateResult) },
+      );
     }
 
     const { provider, model: defaultModel, apiKey } = resolved;
@@ -115,7 +113,10 @@ export async function POST(req: NextRequest) {
       } catch { continue; }
     }
 
-    return Response.json({ slides: generateMockCarousel() }, { headers: getRateLimitHeaders(rateResult) });
+    return Response.json(
+      { error: "Carousel generation failed. Please try again." },
+      { status: 500, headers: getRateLimitHeaders(rateResult) },
+    );
   } catch (error) {
     console.error("Generate carousel error:", error);
     return Response.json({ error: "Something went wrong." }, { status: 500 });
