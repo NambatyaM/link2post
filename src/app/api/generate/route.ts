@@ -3,8 +3,37 @@ import { SYSTEM_PROMPT, buildYouTubePrompt } from "@/lib/prompts";
 import { checkRateLimit, getRateLimitHeaders, recordGeneration } from "@/lib/rate-limit";
 import { verifyToken, extractBearerToken } from "@/lib/auth";
 import { validateLinkedInResult, type ValidationError } from "@/lib/validate";
-import { resolveProviderAndModel } from "@/lib/providers";
+import { PROVIDERS, resolveProviderAndModel } from "@/lib/providers";
 import type { VideoInfo, LinkedInResult } from "@/lib/types";
+
+interface ModelAttempt {
+  provider: { baseUrl: string; label: string; id: string };
+  model: string;
+  apiKey: string;
+}
+
+function buildAttempts(providerId?: string, modelId?: string): ModelAttempt[] {
+  if (providerId) {
+    const resolved = resolveProviderAndModel(providerId, modelId);
+    if (!resolved) return [];
+    const primary = { provider: { baseUrl: resolved.provider.baseUrl, label: resolved.provider.label, id: resolved.provider.id }, model: resolved.model, apiKey: resolved.apiKey };
+    const rest = resolved.provider.models
+      .filter((m) => m.id !== resolved.model)
+      .map((m) => ({ provider: primary.provider, model: m.id, apiKey: resolved.apiKey }));
+    return [primary, ...rest];
+  }
+
+  const attempts: ModelAttempt[] = [];
+  for (const provider of PROVIDERS) {
+    const apiKey = process.env[provider.envKey] || "";
+    if (!apiKey) continue;
+    const base = { baseUrl: provider.baseUrl, label: provider.label, id: provider.id };
+    for (const m of provider.models) {
+      attempts.push({ provider: base, model: m.id, apiKey });
+    }
+  }
+  return attempts;
+}
 
 async function streamCompletion(
   systemPrompt: string,
@@ -13,38 +42,34 @@ async function streamCompletion(
   modelId?: string,
 ): Promise<ReadableStream<Uint8Array>> {
   const encoder = new TextEncoder();
-  const resolved = resolveProviderAndModel(providerId, modelId);
+  const attempts = buildAttempts(providerId, modelId);
 
-  if (!resolved) {
+  if (attempts.length === 0) {
     return mockStream(encoder, generateMockLinkedInResponse());
   }
 
-  const { provider, model, apiKey } = resolved;
-
-  const modelsToTry = [model, ...provider.models.filter((m) => m.id !== model).map((m) => m.id)];
-
-  for (const mdl of modelsToTry) {
+  for (const attempt of attempts) {
     try {
-      const response = await fetch(provider.baseUrl, {
+      const response = await fetch(attempt.provider.baseUrl, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${attempt.apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: mdl,
+          model: attempt.model,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
           ],
           temperature: 0.7,
-          max_tokens: 16000,
+          max_tokens: 32000,
           stream: true,
         }),
       });
 
       if (!response.ok || !response.body) {
-        console.error(`Model ${mdl} (${provider.label}) failed: status=${response.status}`);
+        console.error(`Stream: Model ${attempt.model} (${attempt.provider.label}) failed: status=${response.status}`);
         continue;
       }
 
@@ -79,7 +104,7 @@ async function streamCompletion(
                   if (typeof content === "string" && content.length > 0) {
                     if (firstChunk) {
                       controller.enqueue(
-                        encoder.encode(`data: ${JSON.stringify({ model: mdl, provider: provider.label })}\n\n`),
+                        encoder.encode(`data: ${JSON.stringify({ model: attempt.model, provider: attempt.provider.label })}\n\n`),
                       );
                       firstChunk = false;
                     }
@@ -94,7 +119,7 @@ async function streamCompletion(
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
           } catch (e) {
-            console.error(`Stream error for model ${mdl}:`, e);
+            console.error(`Stream error for model ${attempt.model}:`, e);
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
           }
@@ -286,64 +311,73 @@ export async function generateAndValidate(
   providerId?: string,
   modelId?: string,
 ): Promise<{ result: LinkedInResult; validation: ReturnType<typeof validateLinkedInResult> }> {
-  const resolved = resolveProviderAndModel(providerId, modelId);
+  const attempts = buildAttempts(providerId, modelId);
   const userPrompt = buildYouTubePrompt(videoInfo, timezone, audience);
 
-  if (!resolved) {
+  if (attempts.length === 0) {
+    console.error("generateAndValidate: No providers available, falling back to mock");
     const mockResult = parseAIResponse(generateMockLinkedInResponse())!;
     return { result: mockResult, validation: validateLinkedInResult(mockResult) };
   }
 
-  const { provider, model: defaultModel, apiKey } = resolved;
-  const modelsToTry = [defaultModel, ...provider.models.filter((m) => m.id !== defaultModel).map((m) => m.id)];
+  console.log(`generateAndValidate: ${attempts.length} models to try, starting with ${attempts[0].model} (${attempts[0].provider.label})`);
 
-  for (const mdl of modelsToTry) {
+  for (const attempt of attempts) {
     try {
-      const response = await fetch(provider.baseUrl, {
+      const response = await fetch(attempt.provider.baseUrl, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${attempt.apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: mdl,
+          model: attempt.model,
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: userPrompt },
           ],
           temperature: 0.7,
-          max_tokens: 16000,
+          max_tokens: 32000,
           stream: false,
         }),
       });
 
-      if (!response.ok) continue;
+      if (!response.ok) {
+        console.error(`Model ${attempt.model} (${attempt.provider.label}) returned status ${response.status}`);
+        continue;
+      }
 
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content;
-      if (typeof content !== "string") continue;
+      if (typeof content !== "string") {
+        console.error(`Model ${attempt.model} returned no content string`);
+        continue;
+      }
 
       const result = parseAIResponse(content);
-      if (!result) continue;
+      if (!result) {
+        console.error(`Model ${attempt.model} response failed JSON parsing, preview:`, content.substring(0, 300));
+        continue;
+      }
 
       const validation = validateLinkedInResult(result);
 
       if (!validation.valid) {
         const retryPrompt = buildValidationFeedbackPrompt(userPrompt, validation.errors);
-        const retryResponse = await fetch(provider.baseUrl, {
+        const retryResponse = await fetch(attempt.provider.baseUrl, {
           method: "POST",
           headers: {
-            Authorization: `Bearer ${apiKey}`,
+            Authorization: `Bearer ${attempt.apiKey}`,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            model: mdl,
+            model: attempt.model,
             messages: [
               { role: "system", content: SYSTEM_PROMPT },
               { role: "user", content: retryPrompt },
             ],
             temperature: 0.7,
-            max_tokens: 16000,
+            max_tokens: 32000,
             stream: false,
           }),
         });
@@ -361,7 +395,8 @@ export async function generateAndValidate(
       }
 
       return { result, validation };
-    } catch {
+    } catch (e) {
+      console.error(`Error with model ${attempt.model}:`, e);
       continue;
     }
   }

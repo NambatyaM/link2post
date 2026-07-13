@@ -1,8 +1,7 @@
 import { NextRequest } from "next/server";
-import { getSubtitles, getVideoDetails } from "youtube-caption-extractor";
+import { YoutubeTranscript } from "youtube-transcript";
+import { getVideoDetails } from "youtube-caption-extractor";
 import { checkRateLimit, getRateLimitHeaders } from "@/lib/rate-limit";
-
-const FETCH_TIMEOUT_MS = 10_000;
 
 function extractVideoId(url: string): string | null {
   const patterns = [
@@ -16,14 +15,10 @@ function extractVideoId(url: string): string | null {
   return null;
 }
 
-async function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = FETCH_TIMEOUT_MS): Promise<Response> {
+function fetchWithTimeout(url: string, init?: RequestInit, timeoutMs = 10000): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timer);
-  }
+  return fetch(url, { ...init, signal: controller.signal }).finally(() => clearTimeout(timer));
 }
 
 async function fetchVideoDetails(videoId: string): Promise<{ title: string; description: string } | null> {
@@ -42,7 +37,7 @@ async function fetchVideoDetails(videoId: string): Promise<{ title: string; desc
 
   try {
     const res = await fetchWithTimeout(`https://www.youtube.com/watch?v=${videoId}`, {
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
+      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" },
     });
     if (res.ok) {
       const html = await res.text();
@@ -58,26 +53,49 @@ async function fetchVideoDetails(videoId: string): Promise<{ title: string; desc
 }
 
 async function fetchSubtitles(videoId: string): Promise<string> {
-  const langs = ["en", "en-US", "en-GB"];
+  const errors: string[] = [];
 
-  for (const lang of langs) {
-    try {
-      const subtitles = await getSubtitles({ videoID: videoId, lang });
-      if (subtitles.length > 0) {
-        return subtitles.map((s) => s.text).join(" ");
-      }
-    } catch { /* try next lang */ }
+  // Layer 1: youtube-transcript (InnerTube API + web scraping, most reliable)
+  try {
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId, { lang: "en" });
+    if (transcript.length > 0) {
+      return transcript.map((s) => s.text).join(" ");
+    }
+  } catch (e) {
+    errors.push(`youtube-transcript: ${e instanceof Error ? e.message : "unknown"}`);
   }
 
+  // Layer 1b: Try with other language codes
+  for (const lang of ["en-US", "en-GB", "en"]) {
+    try {
+      const transcript = await YoutubeTranscript.fetchTranscript(videoId, { lang });
+      if (transcript.length > 0) {
+        return transcript.map((s) => s.text).join(" ");
+      }
+    } catch { /* try next */ }
+  }
+
+  // Layer 2: Try auto-generated captions via InnerTube (no language preference)
+  try {
+    const transcript = await YoutubeTranscript.fetchTranscript(videoId);
+    if (transcript.length > 0) {
+      return transcript.map((s) => s.text).join(" ");
+    }
+  } catch (e) {
+    errors.push(`youtube-transcript (no lang): ${e instanceof Error ? e.message : "unknown"}`);
+  }
+
+  // Layer 3: Direct timedtext API scrape from YouTube page HTML
   try {
     const res = await fetchWithTimeout(
       `https://www.youtube.com/watch?v=${videoId}`,
-      { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" } },
+      { headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36" } },
       15000,
     );
     if (res.ok) {
       const html = await res.text();
 
+      // Try to find captionTracks in the page source
       const captionTracksMatch = html.match(/"captionTracks":\s*(\[.*?\])/);
       if (captionTracksMatch) {
         try {
@@ -87,19 +105,65 @@ async function fetchSubtitles(videoId: string): Promise<string> {
             const captionRes = await fetchWithTimeout(enTrack.baseUrl, {}, 10000);
             if (captionRes.ok) {
               const xml = await captionRes.text();
-              const texts = xml.match(/<text[^>]*>(.*?)<\/text>/g);
-              if (texts && texts.length > 0) {
-                return texts
-                  .map((t) => t.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&quot;/g, '"'))
-                  .join(" ");
+
+              // Support both srv3 format (<p t="ms">) and classic format (<text start="s" dur="s">)
+              let texts: string[] = [];
+              const srv3Texts = xml.match(/<p[^>]*>(.*?)<\/p>/g);
+              if (srv3Texts && srv3Texts.length > 0) {
+                texts = srv3Texts.map((t) => t.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&quot;/g, '"'));
+              } else {
+                const classicTexts = xml.match(/<text[^>]*>(.*?)<\/text>/g);
+                if (classicTexts && classicTexts.length > 0) {
+                  texts = classicTexts.map((t) => t.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&quot;/g, '"'));
+                }
+              }
+              if (texts.length > 0) {
+                return texts.join(" ");
               }
             }
           }
         } catch { /* continue */ }
       }
-    }
-  } catch { /* continue */ }
 
+      // Try to find timedtext URL directly
+      const timedtextMatch = html.match(/"baseUrl"\s*:\s*"(https:\/\/www\.youtube\.com\/api\/timedtext[^"]*)"/);
+      if (timedtextMatch) {
+        try {
+          const timedtextUrl = timedtextMatch[1].replace(/\\u0026/g, "&");
+          const captionRes = await fetchWithTimeout(timedtextUrl, {}, 10000);
+          if (captionRes.ok) {
+            const xml = await captionRes.text();
+            const texts = xml.match(/<text[^>]*>(.*?)<\/text>/g);
+            if (texts && texts.length > 0) {
+              return texts
+                .map((t) => t.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&#39;/g, "'").replace(/&quot;/g, '"'))
+                .join(" ");
+            }
+          }
+        } catch { /* continue */ }
+      }
+    }
+  } catch (e) {
+    errors.push(`html-scrape: ${e instanceof Error ? e.message : "unknown"}`);
+  }
+
+  // Layer 4: youtube-caption-extractor as last resort
+  try {
+    const langs = ["en", "en-US", "en-GB"];
+    for (const lang of langs) {
+      try {
+        const { getSubtitles } = await import("youtube-caption-extractor");
+        const subtitles = await getSubtitles({ videoID: videoId, lang });
+        if (subtitles.length > 0) {
+          return subtitles.map((s) => s.text).join(" ");
+        }
+      } catch { /* try next lang */ }
+    }
+  } catch (e) {
+    errors.push(`youtube-caption-extractor: ${e instanceof Error ? e.message : "unknown"}`);
+  }
+
+  console.error(`All transcript methods failed for video ${videoId}:`, errors);
   return "";
 }
 
@@ -140,7 +204,7 @@ export async function POST(req: NextRequest) {
     if (!transcript) {
       return Response.json(
         {
-          error: "No captions available for this video. Try a video with auto-generated or manual captions.",
+          error: "Could not extract captions. The video may not have captions enabled. Try a different video with subtitles.",
           title: details.title,
           description: details.description,
         },
