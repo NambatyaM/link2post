@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
         clearProviderCooldown(attempt.provider.id);
         const data = await response.json();
         const content = data.choices?.[0]?.message?.content;
-        if (typeof content !== "string") continue;
+        if (typeof content !== "string" || content.trim().length === 0) continue;
 
         const slides = parseCarouselResponse(content);
         if (slides) {

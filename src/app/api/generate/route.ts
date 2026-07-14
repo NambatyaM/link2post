@@ -5,6 +5,7 @@ import { verifyToken, extractBearerToken } from "@/lib/auth";
 import { validateLinkedInResult, type ValidationError } from "@/lib/validate";
 import { PROVIDERS, buildAttempts, fetchWithTimeout, recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
 import { generateFullLinkedInResponse } from "@/lib/local-generator";
+import { createThinkingFilter } from "@/lib/thinking-filter";
 import { recordGenerationEvent } from "@/lib/analytics";
 import type { VideoInfo, LinkedInResult } from "@/lib/types";
 
@@ -38,7 +39,7 @@ async function streamCompletion(
             { role: "user", content: userPrompt },
           ],
           temperature: 0.7,
-          max_tokens: 32000,
+          max_tokens: 4000,
           stream: true,
         }),
       });
@@ -54,6 +55,7 @@ async function streamCompletion(
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let firstChunk = true;
+      const filterThinking = createThinkingFilter();
 
       const stream = new ReadableStream({
         async start(controller) {
@@ -80,15 +82,18 @@ async function streamCompletion(
                   const parsed = JSON.parse(data);
                   const content = parsed.choices?.[0]?.delta?.content;
                   if (typeof content === "string" && content.length > 0) {
-                    if (firstChunk) {
+                    const filtered = filterThinking(content);
+                    if (filtered.length > 0) {
+                      if (firstChunk) {
+                        controller.enqueue(
+                          encoder.encode(`data: ${JSON.stringify({ model: attempt.model, provider: attempt.provider.label })}\n\n`),
+                        );
+                        firstChunk = false;
+                      }
                       controller.enqueue(
-                        encoder.encode(`data: ${JSON.stringify({ model: attempt.model, provider: attempt.provider.label })}\n\n`),
+                        encoder.encode(`data: ${JSON.stringify({ content: filtered })}\n\n`),
                       );
-                      firstChunk = false;
                     }
-                    controller.enqueue(
-                      encoder.encode(`data: ${JSON.stringify({ content })}\n\n`),
-                    );
                   }
                 } catch { /* skip malformed */ }
               }
@@ -286,7 +291,7 @@ export async function generateAndValidate(
             { role: "user", content: userPrompt },
           ],
           temperature: 0.7,
-          max_tokens: 32000,
+          max_tokens: 4000,
           stream: false,
         }),
       });
@@ -329,7 +334,7 @@ export async function generateAndValidate(
               { role: "user", content: retryPrompt },
             ],
             temperature: 0.7,
-            max_tokens: 32000,
+          max_tokens: 4000,
             stream: false,
           }),
         });

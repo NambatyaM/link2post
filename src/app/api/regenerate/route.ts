@@ -3,6 +3,7 @@ import { SYSTEM_PROMPT, buildRegeneratePrompt } from "@/lib/prompts";
 import { checkRateLimit, getRateLimitHeaders, recordGeneration } from "@/lib/rate-limit";
 import { verifyToken, extractBearerToken } from "@/lib/auth";
 import { buildAttempts, fetchWithTimeout, recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
+import { createThinkingFilter } from "@/lib/thinking-filter";
 import { recordGenerationEvent } from "@/lib/analytics";
 
 async function streamCompletion(
@@ -48,6 +49,7 @@ async function streamCompletion(
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let firstChunk = true;
+      const filterThinking = createThinkingFilter();
 
       const stream = new ReadableStream({
         async start(controller) {
@@ -70,11 +72,14 @@ async function streamCompletion(
                   const parsed = JSON.parse(data);
                   const content = parsed.choices?.[0]?.delta?.content;
                   if (typeof content === "string" && content.length > 0) {
-                    if (firstChunk) {
-                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ model: attempt.model, provider: attempt.provider.label })}\n\n`));
-                      firstChunk = false;
+                    const filtered = filterThinking(content);
+                    if (filtered.length > 0) {
+                      if (firstChunk) {
+                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ model: attempt.model, provider: attempt.provider.label })}\n\n`));
+                        firstChunk = false;
+                      }
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content: filtered })}\n\n`));
                     }
-                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
                   }
                 } catch { /* skip */ }
               }
@@ -129,7 +134,7 @@ async function generateComplete(
       clearProviderCooldown(attempt.provider.id);
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content;
-      if (typeof content === "string") return content;
+      if (typeof content === "string" && content.trim().length > 0) return content;
     } catch { continue; }
   }
   return null;
