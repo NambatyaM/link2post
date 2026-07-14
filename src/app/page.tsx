@@ -61,6 +61,10 @@ function getAuthHeaders(session: Session | null): Record<string, string> {
   if (session?.access_token) {
     headers["Authorization"] = `Bearer ${session.access_token}`;
   }
+  if (typeof window !== "undefined") {
+    const deviceId = localStorage.getItem("link2post_device_id");
+    if (deviceId) headers["x-device-id"] = deviceId;
+  }
   return headers;
 }
 
@@ -186,6 +190,22 @@ export default function Home() {
       localStorage.setItem("link2post_ref", ref);
       window.history.replaceState({}, "", window.location.pathname);
     }
+
+    let sessionId = localStorage.getItem("link2post_session_id");
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      localStorage.setItem("link2post_session_id", sessionId);
+    }
+    let deviceId = localStorage.getItem("link2post_device_id");
+    if (!deviceId) {
+      deviceId = crypto.randomUUID();
+      localStorage.setItem("link2post_device_id", deviceId);
+    }
+    fetch("/api/analytics/visit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceId, sessionId, path: window.location.pathname }),
+    }).catch(() => {});
   }, []);
 
   const loadActiveCalendar = useCallback(async (sess: Session) => {
@@ -280,7 +300,7 @@ export default function Home() {
 
       const generateRes = await fetch("/api/generate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(session),
         body: JSON.stringify({
           videoInfo: transcriptData,
           timezone,
@@ -292,8 +312,8 @@ export default function Home() {
       });
 
       if (!generateRes.ok) {
-        const errData = await generateRes.json();
-        throw new Error(errData.error || "Generation failed");
+        const errData = await generateRes.json().catch(() => ({}));
+        throw new Error(errData.error || `Generation failed (status ${generateRes.status})`);
       }
 
       const data = await generateRes.json();
@@ -337,15 +357,21 @@ export default function Home() {
   const handleRegenerate = async (type: "post" | "article", index: number) => {
     if (!result) return;
     setLoading(true);
+    setError("");
     try {
       const item = type === "post" ? result.posts[index] : result.articles[index];
       const res = await fetch("/api/regenerate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(session),
         body: JSON.stringify({ type, sourceContent: JSON.stringify(item), videoTitle, provider: selectedModel?.providerId, model: selectedModel?.modelId, stream: false }),
       });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || "Failed to regenerate. Please try again.");
+        return;
+      }
       const data = await res.json();
-      if (res.ok && data.content) {
+      if (data.content) {
         const rawContent = data.content;
         const parsed = parseRegeneratedContent(type, rawContent);
         if (parsed) {
@@ -358,8 +384,12 @@ export default function Home() {
             newResult.articles[index] = parsed as LinkedInArticle;
           }
           setResult(newResult);
+        } else {
+          setError("Could not parse regenerated content. Please try again.");
         }
       }
+    } catch {
+      setError("Network error. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -392,20 +422,30 @@ export default function Home() {
   const handleGenerateScript = async () => {
     if (!result || !videoInfo) return;
     setLoading(true);
+    setError("");
     try {
       const res = await fetch("/api/generate-script", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(session),
         body: JSON.stringify({
           videoInfo,
           provider: selectedModel?.providerId,
           model: selectedModel?.modelId,
         }),
       });
-      const data = await res.json();
-      if (res.ok && data.script) {
-        setScript(data.script);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || "Failed to generate script. Please try again.");
+        return;
       }
+      const data = await res.json();
+      if (data.script) {
+        setScript(data.script);
+      } else {
+        setError("No script data received. Please try again.");
+      }
+    } catch {
+      setError("Network error. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
@@ -414,20 +454,30 @@ export default function Home() {
   const handleGenerateCarousel = async () => {
     if (!result || !videoInfo) return;
     setLoading(true);
+    setError("");
     try {
       const res = await fetch("/api/generate-carousel", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: getAuthHeaders(session),
         body: JSON.stringify({
           videoInfo,
           provider: selectedModel?.providerId,
           model: selectedModel?.modelId,
         }),
       });
-      const data = await res.json();
-      if (res.ok && data.slides) {
-        setCarouselSlides(data.slides);
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        setError(errData.error || "Failed to generate carousel. Please try again.");
+        return;
       }
+      const data = await res.json();
+      if (data.slides) {
+        setCarouselSlides(data.slides);
+      } else {
+        setError("No carousel data received. Please try again.");
+      }
+    } catch {
+      setError("Network error. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }

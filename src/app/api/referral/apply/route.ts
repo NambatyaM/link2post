@@ -54,15 +54,27 @@ export async function POST(req: NextRequest) {
       p_amount: BONUS_PER_REFERRAL,
     });
     if (rpcError) {
+      const { data: existingCredits } = await supabase
+        .from("user_credits")
+        .select("bonus")
+        .eq("user_id", codeRow.user_id)
+        .single();
+      const currentBonus = existingCredits?.bonus || 0;
       await supabase.from("user_credits").upsert({
         user_id: codeRow.user_id,
-        bonus: BONUS_PER_REFERRAL,
+        bonus: currentBonus + BONUS_PER_REFERRAL,
       }, { onConflict: "user_id" });
     }
 
+    const { data: referredCredits } = await supabase
+      .from("user_credits")
+      .select("bonus")
+      .eq("user_id", user.userId)
+      .single();
+    const referredBonus = referredCredits?.bonus || 0;
     await supabase.from("user_credits").upsert({
       user_id: user.userId,
-      bonus: BONUS_PER_REFERRAL,
+      bonus: referredBonus + BONUS_PER_REFERRAL,
     }, { onConflict: "user_id" });
 
     return Response.json({ ok: true });

@@ -52,6 +52,7 @@ export default function VideosLibrary({
   }, [session]);
 
   const handleDelete = async (videoId: string) => {
+    if (!window.confirm("Delete this video and all its content? This cannot be undone.")) return;
     setDeleting(videoId);
     try {
       const res = await fetch(`/api/videos/${videoId}`, {

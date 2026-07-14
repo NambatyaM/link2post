@@ -2,7 +2,9 @@ import { NextRequest } from "next/server";
 import { CAROUSEL_SYSTEM_PROMPT, buildCarouselPrompt } from "@/lib/prompts";
 import { checkRateLimit, getRateLimitHeaders, recordGeneration } from "@/lib/rate-limit";
 import { verifyToken, extractBearerToken } from "@/lib/auth";
-import { resolveProviderAndModel } from "@/lib/providers";
+import { buildAttempts, fetchWithTimeout, recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
+import { generateLocalCarousel } from "@/lib/local-generator";
+import { recordGenerationEvent } from "@/lib/analytics";
 import type { VideoInfo, CarouselSlide } from "@/lib/types";
 
 function parseCarouselResponse(raw: string): CarouselSlide[] | null {
@@ -71,26 +73,30 @@ export async function POST(req: NextRequest) {
     }
 
     await recordGeneration({ userId, deviceId }).catch(() => {});
+    const genStart = Date.now();
 
-    const resolved = resolveProviderAndModel(providerId, modelId);
-    if (!resolved) {
+    const attempts = buildAttempts(providerId, modelId);
+    const userPrompt = buildCarouselPrompt(videoInfo);
+
+    if (attempts.length === 0) {
+      const local = generateLocalCarousel(videoInfo);
+      recordGenerationEvent({
+        userId, deviceId, generationType: "carousel",
+        providerId: "local", modelId: "local", success: true, durationMs: 0,
+      }).catch(() => {});
       return Response.json(
-        { error: "No AI provider available. Please configure an API key." },
-        { status: 503, headers: getRateLimitHeaders(rateResult) },
+        { slides: local },
+        { status: 200, headers: getRateLimitHeaders(rateResult) },
       );
     }
 
-    const { provider, model: defaultModel, apiKey } = resolved;
-    const modelsToTry = [defaultModel, ...provider.models.filter((m) => m.id !== defaultModel).map((m) => m.id)];
-    const userPrompt = buildCarouselPrompt(videoInfo);
-
-    for (const mdl of modelsToTry) {
+    for (const attempt of attempts) {
       try {
-        const response = await fetch(provider.baseUrl, {
+        const response = await fetchWithTimeout(attempt.provider.baseUrl, {
           method: "POST",
-          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          headers: { Authorization: `Bearer ${attempt.apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: mdl,
+            model: attempt.model,
             messages: [
               { role: "system", content: CAROUSEL_SYSTEM_PROMPT },
               { role: "user", content: userPrompt },
@@ -101,21 +107,37 @@ export async function POST(req: NextRequest) {
           }),
         });
 
-        if (!response.ok) continue;
+        if (!response.ok) {
+          console.error(`Carousel: ${attempt.model} (${attempt.provider.label}) failed: ${response.status}`);
+          recordProviderFailure(attempt.provider.id);
+          continue;
+        }
+        clearProviderCooldown(attempt.provider.id);
         const data = await response.json();
         const content = data.choices?.[0]?.message?.content;
         if (typeof content !== "string") continue;
 
         const slides = parseCarouselResponse(content);
         if (slides) {
+          const durationMs = Date.now() - genStart;
+          recordGenerationEvent({
+            userId, deviceId, generationType: "carousel",
+            providerId: attempt.provider.id, modelId: attempt.model, success: true, durationMs,
+          }).catch(() => {});
           return Response.json({ slides }, { headers: getRateLimitHeaders(rateResult) });
         }
       } catch { continue; }
     }
 
+    const fallback = generateLocalCarousel(videoInfo);
+    const durationMs = Date.now() - genStart;
+    recordGenerationEvent({
+      userId, deviceId, generationType: "carousel",
+      providerId: "local", modelId: "local", success: true, durationMs,
+    }).catch(() => {});
     return Response.json(
-      { error: "Carousel generation failed. Please try again." },
-      { status: 500, headers: getRateLimitHeaders(rateResult) },
+      { slides: fallback },
+      { status: 200, headers: getRateLimitHeaders(rateResult) },
     );
   } catch (error) {
     console.error("Generate carousel error:", error);

@@ -2,6 +2,7 @@ import { getSupabaseServer } from "./supabase-server";
 
 export interface AuthUser {
   userId: string;
+  email?: string;
 }
 
 export function extractBearerToken(request: Request): string | null {
@@ -16,7 +17,7 @@ export async function verifyToken(token: string): Promise<AuthUser | null> {
     const supabase = getSupabaseServer();
     const { data, error } = await supabase.auth.getUser(token);
     if (error || !data.user) return null;
-    return { userId: data.user.id };
+    return { userId: data.user.id, email: data.user.email };
   } catch {
     return null;
   }

@@ -6,10 +6,11 @@ export const VIDEO_SCRIPT_SYSTEM_PROMPT = `You are a short-form video scriptwrit
 RULES:
 1. Extract the 3-4 most compelling points from the transcript
 2. Write in conversational, spoken-word style (not written-word)
-3. Keep total under 150 words (~60 seconds when spoken)
-4. Include visual direction for each section
-5. Add on-screen text overlay suggestions (captions)
-6. The hook must stop the scroll in the first 3 seconds
+3. Match the creator's voice exactly — their vocabulary, rhythm, energy, and mannerisms
+4. Keep total under 150 words (~60 seconds when spoken)
+5. Include visual direction for each section
+6. Add on-screen text overlay suggestions (captions)
+7. The hook must stop the scroll in the first 3 seconds
 
 STRUCTURE:
 - Hook (0:00-0:03): Pattern interrupt, bold claim, or relatable question
@@ -49,6 +50,7 @@ WRITING STYLE:
 - Include specific numbers, percentages, or examples from the transcript
 - Every slide must make sense on its own (people screenshot individual slides)
 - No filler words, no corporate jargon, no vague statements
+- Match the creator's voice — if they're casual, be casual. If they use specific jargon, use it. If they're data-heavy, lead with numbers.
 
 Return ONLY valid JSON:
 {
@@ -71,6 +73,19 @@ Before generating anything, extract from the YouTube transcript:
 - For each moment: the core insight, any supporting example/story/data point, and enough detail that a reader who never watched the video would understand it fully.
 
 Do NOT summarize the whole video. Pull out standalone moments that don't need the source material to make sense.
+
+--- STEP 0.5: VOICE & TONE ANALYSIS ---
+
+Before writing ANY content, analyze the transcript to identify the creator's voice:
+
+1. **Vocabulary level**: Are they casual ("gonna", "stuff", "basically") or formal ("therefore", "consequently", "nonetheless")? Match it exactly.
+2. **Sentence rhythm**: Do they speak in short punchy bursts or long flowing explanations? Mirror their cadence.
+3. **Energy level**: Are they high-energy and enthusiastic, or calm and measured? Match their vibe.
+4. **Signature patterns**: Do they use analogies? Rhetorical questions? Self-deprecating humor? Direct address ("you")? Third-person teaching? Copy their style.
+5. **Jargon & terminology**: If they use industry-specific terms, acronyms, or niche vocabulary, use them naturally. Don't "translate" their language into generic corporate-speak.
+6. **What they would NEVER say**: If the creator never says "I hope this helps" or "Let me know your thoughts", don't add it. Stay true to their authentic voice.
+
+The output should read as if the creator wrote it themselves, not as if a content writer summarized their video.
 
 --- POST GENERATION RULES ---
 
@@ -196,7 +211,10 @@ export function buildYouTubePrompt(
     d.setDate(today.getDate() + i);
     const dayName = days[d.getDay()];
     if (["Tuesday", "Wednesday", "Thursday", "Friday"].includes(dayName)) {
-      upcoming.push({ day: dayName, date: d.toISOString().split("T")[0] });
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      upcoming.push({ day: dayName, date: `${year}-${month}-${day}` });
     }
     if (upcoming.length >= 5) break;
   }
@@ -229,6 +247,15 @@ ${audience ? `---TARGET AUDIENCE---\n${audience}` : ""}
 
 STEP 0 — TRANSCRIPT INTAKE:
 First, extract 5-8 distinct standalone moments from the transcript. Each moment is a specific claim, story, framework, mistake, or number that could stand alone without the rest of the video. For each moment, note the core insight, supporting example, and enough detail for a reader who never watched the video.
+
+STEP 0.5 — VOICE & TONE ANALYSIS:
+Before writing, analyze the transcript to identify the creator's voice:
+- Vocabulary level: casual or formal? Match exactly.
+- Sentence rhythm: short punchy bursts or long flowing explanations? Mirror their cadence.
+- Energy level: high-energy enthusiastic or calm measured? Match their vibe.
+- Signature patterns: analogies? Rhetorical questions? Self-deprecating humor? Copy their style.
+- Jargon: use their industry-specific terms naturally, don't translate to generic corporate-speak.
+- The output should read as if the creator wrote it themselves.
 
 STEP 1 — POSTS (generate 4-5):
 For each post, pick a different moment. Follow these rules exactly:

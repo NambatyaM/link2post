@@ -33,14 +33,22 @@ export async function POST(req: NextRequest) {
 
     let code = generateCode();
     let attempts = 0;
+    let saved = false;
     while (attempts < 10) {
       const { error } = await supabase.from("referral_codes").insert({
         user_id: user.userId,
         code,
       });
-      if (!error) break;
+      if (!error) {
+        saved = true;
+        break;
+      }
       code = generateCode();
       attempts++;
+    }
+
+    if (!saved) {
+      return Response.json({ error: "Failed to create referral code" }, { status: 500 });
     }
 
     const url = `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}?ref=${code}`;

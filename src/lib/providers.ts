@@ -12,6 +12,48 @@ export interface Provider {
   models: ProviderModel[];
 }
 
+const PROVIDER_COOLDOWN_MS = 60_000;
+// eslint-disable-next-line no-undef
+const providerFailures: Map<string, number> = (typeof globalThis !== "undefined" && (globalThis as Record<string, unknown>).__providerFailures as Map<string, number>) || new Map();
+if (typeof globalThis !== "undefined") {
+  (globalThis as Record<string, unknown>).__providerFailures = providerFailures;
+}
+
+export function recordProviderFailure(providerId: string): void {
+  providerFailures.set(providerId, Date.now() + PROVIDER_COOLDOWN_MS);
+}
+
+export function clearProviderCooldown(providerId: string): void {
+  providerFailures.delete(providerId);
+}
+
+function isProviderCoolingDown(providerId: string): boolean {
+  const cooldownUntil = providerFailures.get(providerId);
+  if (!cooldownUntil) return false;
+  if (Date.now() >= cooldownUntil) {
+    providerFailures.delete(providerId);
+    return false;
+  }
+  return true;
+}
+
+export const FETCH_TIMEOUT_MS = 25_000;
+
+export async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number = FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { ...init, signal: controller.signal });
+    return response;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export const PROVIDERS: Provider[] = [
   {
     id: "groq",
@@ -22,8 +64,8 @@ export const PROVIDERS: Provider[] = [
     models: [
       { id: "llama-3.3-70b-versatile", label: "Llama 3.3 70B" },
       { id: "llama-3.1-8b-instant", label: "Llama 3.1 8B (Fast)" },
-      { id: "mixtral-8x7b-32768", label: "Mixtral 8x7B" },
-      { id: "gemma2-9b-it", label: "Gemma 2 9B" },
+      { id: "openai/gpt-oss-120b", label: "GPT OSS 120B" },
+      { id: "qwen/qwen3-32b", label: "Qwen3 32B" },
     ],
   },
   {
@@ -34,8 +76,6 @@ export const PROVIDERS: Provider[] = [
     envKey: "GEMINI_API_KEY",
     models: [
       { id: "gemini-2.5-flash", label: "Gemini 2.5 Flash" },
-      { id: "gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite" },
-      { id: "gemini-2.0-flash", label: "Gemini 2.0 Flash" },
     ],
   },
   {
@@ -46,9 +86,9 @@ export const PROVIDERS: Provider[] = [
     envKey: "OPENROUTER_API_KEY",
     models: [
       { id: "meta-llama/llama-3.3-70b-instruct:free", label: "Llama 3.3 70B (Free)" },
-      { id: "deepseek/deepseek-r1:free", label: "DeepSeek R1 (Free)" },
-      { id: "mistralai/mistral-small-3.1-24b-instruct:free", label: "Mistral Small 3.1 (Free)" },
-      { id: "qwen/qwen-2.5-72b-instruct:free", label: "Qwen 2.5 72B (Free)" },
+      { id: "nvidia/nemotron-3-super-120b-a12b:free", label: "Nemotron 3 Super (Free)" },
+      { id: "google/gemma-4-31b-it:free", label: "Gemma 4 31B (Free)" },
+      { id: "qwen/qwen3-coder:free", label: "Qwen3 Coder (Free)" },
     ],
   },
   {
@@ -58,8 +98,8 @@ export const PROVIDERS: Provider[] = [
     baseUrl: "https://api.cerebras.ai/v1/chat/completions",
     envKey: "CEREBRAS_API_KEY",
     models: [
-      { id: "llama-3.3-70b", label: "Llama 3.3 70B" },
-      { id: "llama-3.1-8b", label: "Llama 3.1 8B (Fast)" },
+      { id: "gpt-oss-120b", label: "GPT OSS 120B" },
+      { id: "gemma-4-31b", label: "Gemma 4 31B" },
     ],
   },
   {
@@ -127,6 +167,43 @@ export function getActiveProviders(): { provider: Provider; apiKey: string; mode
       models: provider.models,
     }))
     .filter((entry) => entry.apiKey.length > 0);
+}
+
+export interface ModelAttempt {
+  provider: { baseUrl: string; label: string; id: string };
+  model: string;
+  apiKey: string;
+}
+
+export function buildAttempts(providerId?: string, modelId?: string): ModelAttempt[] {
+  const selectedAttempts: ModelAttempt[] = [];
+  const fallbackAttempts: ModelAttempt[] = [];
+
+  if (providerId) {
+    const resolved = resolveProviderAndModel(providerId, modelId);
+    if (resolved && !isProviderCoolingDown(providerId)) {
+      const primary = { provider: { baseUrl: resolved.provider.baseUrl, label: resolved.provider.label, id: resolved.provider.id }, model: resolved.model, apiKey: resolved.apiKey };
+      selectedAttempts.push(primary);
+      for (const m of resolved.provider.models) {
+        if (m.id !== resolved.model && !isProviderCoolingDown(providerId)) {
+          selectedAttempts.push({ provider: primary.provider, model: m.id, apiKey: resolved.apiKey });
+        }
+      }
+    }
+  }
+
+  for (const provider of PROVIDERS) {
+    if (provider.id === providerId) continue;
+    const apiKey = getProviderApiKey(provider);
+    if (!apiKey) continue;
+    if (isProviderCoolingDown(provider.id)) continue;
+    const base = { baseUrl: provider.baseUrl, label: provider.label, id: provider.id };
+    for (const m of provider.models) {
+      fallbackAttempts.push({ provider: base, model: m.id, apiKey });
+    }
+  }
+
+  return [...selectedAttempts, ...fallbackAttempts];
 }
 
 export function getDefaultProvider(): { provider: Provider; modelId: string } | null {

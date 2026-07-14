@@ -45,7 +45,7 @@ describe("POST /api/generate", () => {
     const res = await POST(makeRequest({
       videoInfo: { title: "Test Video", description: "Desc", transcript: "a ".repeat(200), url: "https://youtube.com/watch?v=abc", videoId: "abc" },
       timezone: "America/New_York",
-    }));
+    }, { "x-device-id": "test-device-123" }));
 
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/event-stream");
@@ -92,7 +92,7 @@ describe("POST /api/generate", () => {
     const res = await POST(makeRequest({
       videoInfo: { title: "T", description: "D", transcript: "word ".repeat(200), url: "url", videoId: "x" },
       timezone: "America/New_York",
-    }));
+    }, { "x-device-id": "test-device-456" }));
     expect(res.headers.has("X-RateLimit-Remaining")).toBe(true);
   });
 });

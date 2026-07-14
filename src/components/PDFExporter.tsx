@@ -7,9 +7,10 @@ import type { CarouselSlide } from "@/lib/types";
 
 const SLIDE_SIZE = 1080;
 
-function SlideRenderer({ slide, slideRef }: { slide: CarouselSlide; slideRef?: React.RefObject<HTMLDivElement | null> }) {
+function SlideRenderer({ slide, slideRef, totalSlides }: { slide: CarouselSlide; slideRef?: React.RefObject<HTMLDivElement | null>; totalSlides?: number }) {
   const isFirst = slide.slideNumber === 1;
-  const isLast = slide.slideNumber === 10;
+  const total = totalSlides || 10;
+  const isLast = slide.slideNumber === total;
 
   return (
     <div
@@ -42,7 +43,7 @@ function SlideRenderer({ slide, slideRef }: { slide: CarouselSlide; slideRef?: R
           textTransform: "uppercase",
         }}
       >
-        {slide.slideNumber} / 10
+        {slide.slideNumber} / {total}
       </div>
 
       {isFirst && (
@@ -108,7 +109,7 @@ function SlideRenderer({ slide, slideRef }: { slide: CarouselSlide; slideRef?: R
           left: "40px",
           right: "40px",
           height: "3px",
-          background: `linear-gradient(to right, #6366f1 ${(slide.slideNumber / 10) * 100}%, rgba(255,255,255,0.1) ${(slide.slideNumber / 10) * 100}%)`,
+          background: `linear-gradient(to right, #6366f1 ${(slide.slideNumber / total) * 100}%, rgba(255,255,255,0.1) ${(slide.slideNumber / total) * 100}%)`,
           borderRadius: "2px",
         }}
       />
@@ -179,23 +180,23 @@ export default function PDFExporter({ slides, videoTitle }: { slides: CarouselSl
             }}
           >
             <div style={{ transform: "scale(0.167)", transformOrigin: "top left", width: `${SLIDE_SIZE}px`, height: `${SLIDE_SIZE}px` }}>
-              <SlideRenderer slide={slide} />
+              <SlideRenderer slide={slide} totalSlides={slides.length} />
             </div>
-            <div style={{ width: "180px", height: `${180 * (SLIDE_SIZE / SLIDE_SIZE) - 180}px`, marginTop: `-${SLIDE_SIZE * 0.167 - 180}px` }} />
+            <div style={{ width: "180px", height: "180px" }} />
           </button>
         ))}
       </div>
 
       <div className="mt-4 rounded-xl overflow-hidden" style={{ border: "1px solid var(--border-light)" }}>
         <div style={{ transform: "scale(0.45)", transformOrigin: "top left", width: `${SLIDE_SIZE}px`, height: `${SLIDE_SIZE}px` }}>
-          <SlideRenderer slide={slides[previewSlide]} />
+          <SlideRenderer slide={slides[previewSlide]} totalSlides={slides.length} />
         </div>
         <div style={{ height: `${SLIDE_SIZE * 0.45}px` }} />
       </div>
 
       <div className="hidden">
         {slides.map((slide) => (
-          <SlideRenderer key={slide.slideNumber} slide={slide} />
+          <SlideRenderer key={slide.slideNumber} slide={slide} totalSlides={slides.length} />
         ))}
       </div>
     </div>

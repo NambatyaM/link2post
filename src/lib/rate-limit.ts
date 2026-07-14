@@ -96,6 +96,10 @@ export async function checkRateLimit(opts: {
     return { allowed: true, remaining: limit - used - 1, retryAfterMs: 0, limit, plan };
   }
 
+  if (!userId && !deviceId) {
+    return { allowed: false, remaining: 0, retryAfterMs: WINDOW_MS, limit: 0, plan };
+  }
+
   return { allowed: true, remaining: limit, retryAfterMs: 0, limit, plan };
 }
 

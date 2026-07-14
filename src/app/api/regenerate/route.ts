@@ -2,7 +2,8 @@ import { NextRequest } from "next/server";
 import { SYSTEM_PROMPT, buildRegeneratePrompt } from "@/lib/prompts";
 import { checkRateLimit, getRateLimitHeaders, recordGeneration } from "@/lib/rate-limit";
 import { verifyToken, extractBearerToken } from "@/lib/auth";
-import { resolveProviderAndModel } from "@/lib/providers";
+import { buildAttempts, fetchWithTimeout, recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
+import { recordGenerationEvent } from "@/lib/analytics";
 
 async function streamCompletion(
   prompt: string,
@@ -10,25 +11,22 @@ async function streamCompletion(
   modelId?: string,
 ): Promise<ReadableStream<Uint8Array>> {
   const encoder = new TextEncoder();
-  const resolved = resolveProviderAndModel(providerId, modelId);
+  const attempts = buildAttempts(providerId, modelId);
 
-  if (!resolved) {
+  if (attempts.length === 0) {
     return mockStream(encoder, `Mock regenerated content for: ${prompt.slice(0, 100)}`);
   }
 
-  const { provider, model, apiKey } = resolved;
-  const modelsToTry = [model, ...provider.models.filter((m) => m.id !== model).map((m) => m.id)];
-
-  for (const mdl of modelsToTry) {
+  for (const attempt of attempts) {
     try {
-      const response = await fetch(provider.baseUrl, {
+      const response = await fetchWithTimeout(attempt.provider.baseUrl, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${attempt.apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: mdl,
+          model: attempt.model,
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: prompt },
@@ -39,7 +37,13 @@ async function streamCompletion(
         }),
       });
 
-      if (!response.ok || !response.body) continue;
+      if (!response.ok || !response.body) {
+        console.error(`Regenerate stream: ${attempt.model} (${attempt.provider.label}) failed: ${response.status}`);
+        recordProviderFailure(attempt.provider.id);
+        continue;
+      }
+
+      clearProviderCooldown(attempt.provider.id);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -67,7 +71,7 @@ async function streamCompletion(
                   const content = parsed.choices?.[0]?.delta?.content;
                   if (typeof content === "string" && content.length > 0) {
                     if (firstChunk) {
-                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ model: mdl, provider: provider.label })}\n\n`));
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ model: attempt.model, provider: attempt.provider.label })}\n\n`));
                       firstChunk = false;
                     }
                     controller.enqueue(encoder.encode(`data: ${JSON.stringify({ content })}\n\n`));
@@ -95,22 +99,18 @@ async function generateComplete(
   providerId?: string,
   modelId?: string,
 ): Promise<string | null> {
-  const resolved = resolveProviderAndModel(providerId, modelId);
-  if (!resolved) return null;
+  const attempts = buildAttempts(providerId, modelId);
 
-  const { provider, model, apiKey } = resolved;
-  const modelsToTry = [model, ...provider.models.filter((m) => m.id !== model).map((m) => m.id)];
-
-  for (const mdl of modelsToTry) {
+  for (const attempt of attempts) {
     try {
-      const response = await fetch(provider.baseUrl, {
+      const response = await fetchWithTimeout(attempt.provider.baseUrl, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${apiKey}`,
+          Authorization: `Bearer ${attempt.apiKey}`,
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          model: mdl,
+          model: attempt.model,
           messages: [
             { role: "system", content: SYSTEM_PROMPT },
             { role: "user", content: prompt },
@@ -121,7 +121,12 @@ async function generateComplete(
         }),
       });
 
-      if (!response.ok) continue;
+      if (!response.ok) {
+        console.error(`Regenerate complete: ${attempt.model} (${attempt.provider.label}) failed: ${response.status}`);
+        recordProviderFailure(attempt.provider.id);
+        continue;
+      }
+      clearProviderCooldown(attempt.provider.id);
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content;
       if (typeof content === "string") return content;
@@ -183,11 +188,17 @@ export async function POST(req: NextRequest) {
     }
 
     await recordGeneration({ userId, deviceId }).catch(() => {});
+    const genStart = Date.now();
 
     const prompt = buildRegeneratePrompt(type, sourceContent, videoTitle);
 
     if (wantStream === false) {
       const content = await generateComplete(prompt, providerId, modelId);
+      const durationMs = Date.now() - genStart;
+      recordGenerationEvent({
+        userId, deviceId, generationType: "regenerate",
+        providerId, modelId, success: !!content, durationMs,
+      }).catch(() => {});
       if (!content) {
         return Response.json({ content: `Regenerated content for: ${sourceContent.slice(0, 100)}` }, {
           status: 200,
@@ -201,6 +212,11 @@ export async function POST(req: NextRequest) {
     }
 
     const stream = await streamCompletion(prompt, providerId, modelId);
+    const durationMs = Date.now() - genStart;
+    recordGenerationEvent({
+      userId, deviceId, generationType: "regenerate",
+      providerId, modelId, success: true, durationMs,
+    }).catch(() => {});
 
     return new Response(stream, {
       status: 200,
