@@ -1,7 +1,18 @@
 import type { VideoInfo, LinkedInResult, LinkedInPost, LinkedInArticle, CalendarEntry, VideoScript, CarouselSlide } from "./types";
-import { POSTING_SCHEDULE } from "./types";
 
-function extractKeyPhrases(transcript: string): string[] {
+function extractSentences(text: string, minLen = 25): string[] {
+  return text
+    .split(/[.!?\n]+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= minLen && s.split(/\s+/).length >= 5);
+}
+
+function extractNumbers(text: string): string[] {
+  const matches = text.match(/\d[\d,.]*%?/g) || [];
+  return [...new Set(matches)].slice(0, 8);
+}
+
+function extractKeyphrases(transcript: string): string[] {
   const words = transcript.toLowerCase().replace(/[^a-z0-9\s'-]/g, " ").split(/\s+/).filter((w) => w.length > 3);
   const stopWords = new Set(["this", "that", "with", "from", "they", "them", "their", "what", "when", "where", "which", "about", "would", "could", "should", "there", "these", "those", "your", "have", "been", "were", "just", "like", "very", "some", "more", "than", "into", "also", "here", "well", "only", "come", "make", "know", "take", "people", "think", "really", "going", "thing", "things", "about", "because", "through", "after", "before", "between", "under", "over", "does", "will", "each", "made", "want", "look", "first", "last", "back", "good", "much", "many", "most", "even", "still", "right", "left", "down", "keep", "being", "doing", "said", "tell", "told", "want", "give", "given", "every", "part", "help", "start", "show", "try", "way", "using", "used", "case", "work", "works", "time", "year", "years", "day", "days", "week", "months", "something", "actually", "different", "important", "another", "enough", "maybe", "often", "while", "whole", "however", "already", "let", "sure", "long", "small", "high", "made"]);
   const freq = new Map<string, number>();
@@ -9,17 +20,7 @@ function extractKeyPhrases(transcript: string): string[] {
     if (stopWords.has(w)) continue;
     freq.set(w, (freq.get(w) || 0) + 1);
   }
-  const sorted = [...freq.entries()].sort((a, b) => b[1] - a[1]);
-  return sorted.slice(0, 12).map(([w]) => w);
-}
-
-function extractNumbers(text: string): string[] {
-  const matches = text.match(/\d[\d,.]*%?/g) || [];
-  return [...new Set(matches)].slice(0, 6);
-}
-
-function extractSentences(text: string, minLen = 30): string[] {
-  return text.split(/[.!?]+/).map((s) => s.trim()).filter((s) => s.length >= minLen).slice(0, 15);
+  return [...freq.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([w]) => w);
 }
 
 function pick<T>(arr: T[], count: number, seed: number): T[] {
@@ -46,144 +47,120 @@ function hashCode(str: string): number {
   return Math.abs(h);
 }
 
-function buildHook(keyphrase: string, numbers: string[]): string {
-  const hooks = [
-    `I tracked ${keyphrase} for 90 days. The data changed how I think about everything.`,
-    `Most people get ${keyphrase} completely wrong. Here's what actually works.`,
-    `${numbers[0] || "87%"} of people misunderstand ${keyphrase}. Here's the reality.`,
-    `The biggest mistake I see with ${keyphrase}? Treating it like it's optional.`,
-    `I spent 6 months studying ${keyphrase}. Here are 3 things nobody talks about.`,
-    `Stop ignoring ${keyphrase}. Here's why it matters more than you think.`,
-    `Nobody tells you this about ${keyphrase}, but it changes everything.`,
-    `I tested ${keyphrase} for 6 months straight. The results surprised me.`,
-    `The ${keyphrase} problem nobody is talking about — and how to fix it.`,
-    `I analyzed ${numbers[0] || "hundreds of"} cases of ${keyphrase}. The pattern is clear.`,
+function buildHookFromTranscript(sentences: string[], numbers: string[], seed: number): string {
+  const bestSentence = sentences[seed % sentences.length] || "This changes everything";
+  const truncated = bestSentence.length > 80 ? bestSentence.slice(0, 77) + "..." : bestSentence;
+  const num = numbers[seed % numbers.length] || "";
+
+  const patterns = [
+    `"${truncated}"`,
+    num ? `${num} — and here's why that matters:` : `"${truncated}" — here's why that matters:`,
+    `I couldn't ignore this: "${truncated.toLowerCase()}"`,
+    `This stuck with me: "${truncated.toLowerCase()}"`,
+    `"${truncated}" — most people miss this.`,
   ];
-  return hooks[Math.floor(Math.random() * hooks.length)];
+
+  return patterns[seed % patterns.length];
 }
 
-function buildPostBody(keyphrase: string, sentences: string[], numbers: string[]): string {
-  const detail = sentences[0] || `The data on ${keyphrase} tells a different story than what most people assume`;
-  const stat = numbers[0] || "73%";
-  const insight = sentences[1] || `When you look at the actual evidence, ${keyphrase} comes down to consistency and specificity`;
+function buildPostBodyFromTranscript(
+  topicSentences: string[],
+  allSentences: string[],
+  numbers: string[],
+  seed: number,
+): string {
+  const hook = topicSentences[0] || allSentences[0] || "This insight changed my perspective.";
+  const detail1 = topicSentences[1] || allSentences[1 + seed % Math.max(1, allSentences.length - 1)] || "The evidence is clear when you look at it honestly.";
+  const detail2 = topicSentences[2] || allSentences[2 + seed % Math.max(1, allSentences.length - 2)] || "And the results speak for themselves.";
+  const num = numbers[seed % numbers.length] || "";
 
-  return `Everyone has an opinion on ${keyphrase}. But opinions don't move the needle.
+  const paragraphs: string[] = [];
+  paragraphs.push(hook.endsWith(".") ? hook : hook + ".");
+  paragraphs.push("");
+  paragraphs.push(detail1.endsWith(".") ? detail1 : detail1 + ".");
+  paragraphs.push("");
+  if (num) {
+    paragraphs.push(`The numbers back this up: ${num}.`);
+    paragraphs.push("");
+  }
+  paragraphs.push(detail2.endsWith(".") ? detail2 : detail2 + ".");
+  paragraphs.push("");
+  paragraphs.push("This isn't theory. This is what actually works when you pay attention to the details.");
 
-${detail}.
-
-That single insight reframed how I approach ${keyphrase} entirely.
-
-**The difference between average and exceptional comes down to one thing: specificity.**
-
-Here's what I mean:
-
-Most people treat ${keyphrase} as a checkbox. They do it because they feel they should, not because they have a system.
-
-The ones who get real results — the ${stat} who actually see outcomes — do something different.
-
-They get specific. They measure. They adjust.
-
-${insight}.
-
-That's not theory. That's what the data shows, repeatedly.
-
-The question isn't whether ${keyphrase} matters. It's whether you're willing to be specific about how you do it.`;
+  return paragraphs.join("\n");
 }
 
-function buildImagePrompt(keyphrase: string): string {
-  const prompts = [
-    `A split-screen conceptual image: left side shows a messy, chaotic workspace representing ${keyphrase} done wrong, right side shows a clean, organized approach with clear structure. The dividing line is a subtle arrow pointing right. Modern infographic style, white background with warm accent colors.`,
-    `A close-up of a notebook page with ${keyphrase} written at the top, surrounded by specific data points, arrows, and a highlighted key insight. The page is slightly worn, suggesting real-world use. Warm, focused editorial photography style with shallow depth of field.`,
-    `A conceptual illustration of a magnifying glass focused on the word "${keyphrase}" with blurred generic text around it. The focused area is sharp and colorful while the background fades to gray. Clean, minimal design style.`,
-    `An overhead shot of a whiteboard with a clear framework drawn on it related to ${keyphrase}, with sticky notes in different colors marking key steps. The board is partially filled, suggesting active planning. Bright, natural light, productive atmosphere.`,
-    `A data visualization showing an upward trend line with ${keyphrase} as the x-axis label. The chart uses warm gradient colors from blue to gold. Clean, modern infographic style on a white background with subtle grid lines.`,
-  ];
-  return prompts[Math.floor(Math.random() * prompts.length)];
+function buildImagePromptFromTranscript(sentence: string, keyphrase: string): string {
+  const shortSentence = sentence.length > 60 ? sentence.slice(0, 57) + "..." : sentence;
+  return `A clean, minimal visual showing: "${shortSentence}" — modern editorial style, warm tones, professional LinkedIn aesthetic, slight depth of field, text overlay with the key insight.`;
 }
 
-function buildArticleTitle(keyphrase: string): string {
-  const titles = [
-    `The ${keyphrase} Framework That Actually Delivers Results`,
-    `Why ${keyphrase} Fails for Most People — And What Works Instead`,
-    `A Practical Guide to ${keyphrase}: What the Data Actually Shows`,
-    `${keyphrase}: The Mistakes I See Everyone Making (and How to Fix Them)`,
-    `How to Get Real Results with ${keyphrase}: Lessons from 6 Months of Testing`,
-  ];
-  return titles[Math.floor(Math.random() * titles.length)];
-}
+function buildArticleBodyFromTranscript(
+  keyphrase: string,
+  sentences: string[],
+  numbers: string[],
+): string {
+  const s1 = sentences[0] || "The conventional approach misses something critical.";
+  const s2 = sentences[1] || "When you dig into the details, the pattern becomes obvious.";
+  const s3 = sentences[2] || "This is what separates those who get results from those who don't.";
+  const s4 = sentences[3] || "The evidence points to one clear conclusion.";
+  const s5 = sentences[4] || "And the compound effect is what matters most.";
+  const n1 = numbers[0] || "";
+  const n2 = numbers[1] || "";
 
-function buildArticleBody(keyphrase: string, sentences: string[], numbers: string[]): string {
-  const stat = numbers[0] || "73%";
-  const detail = sentences[0] || `The conventional wisdom on ${keyphrase} misses a critical piece`;
-  const insight = sentences[1] || `When you dig into the actual data, the pattern becomes obvious`;
+  return `## The Core Insight
 
-  return `## The ${keyphrase} Problem Nobody Solves
+${s1}
 
-Most advice about ${keyphrase} sounds reasonable. It's also largely wrong.
-
-${detail}. That's not an opinion — it's what happens when you look at the outcomes across ${numbers[1] || "hundreds of"} real-world cases.
+That's not an opinion — it's what happens when you actually look at the outcomes. ${n1 ? `The data shows ${n1} across real-world cases.` : "The evidence is consistent across dozens of examples."}
 
 [IMAGE PROMPT 1]
 
-## What the Data Actually Shows
+## What Most People Get Wrong
 
-Here's what separates the ${stat} who get real results from everyone else:
+${s2}. ${n2 ? `Consider this: ${n2}.` : "The pattern is clear once you see it."}
 
-| Approach | What Most People Do | What Works |
-|----------|-------------------|------------|
-| Strategy | Generic, one-size-fits-all | Specific to their context |
-| Measurement | Vanity metrics | Outcome-based tracking |
-| Consistency | Sporadic, reactive | Systematic, proactive |
+Most approaches to ${keyphrase} fail because they focus on the wrong thing. They optimize for activity instead of outcomes. They measure what's easy instead of what matters.
 
-The pattern is clear. ${insight}.
+**The real difference is specificity.**
 
-**The biggest unlock isn't doing more — it's doing the right things with precision.**
+| What Most People Do | What Actually Works |
+|---------------------|-------------------|
+| Generic strategies | Specific to their context |
+| Vanity metrics | Outcome-based tracking |
+| Sporadic effort | Systematic consistency |
+
+## The Framework
+
+${s3}
+
+Here's what I've learned works:
+
+**First:** Get specific about what success looks like. Not "do better" — exactly what, by how much, and by when.
+
+**Second:** Build feedback loops. ${s4} The people who win aren't the ones with the best plan. They're the ones who adjust fastest.
+
+**Third:** Let it compound. ${s5} Consistency over time creates the gap between average and exceptional.
 
 [IMAGE PROMPT 2]
 
-## The Framework That Changes Everything
-
-After studying ${keyphrase} across ${numbers[1] || "dozens of"} cases, I distilled it into three principles:
-
-**Principle 1: Specificity beats volume.**
-
-Every successful case of ${keyphrase} started with getting specific about what success looks like. Not "do better" — but exactly what, by how much, and by when.
-
-**Principle 2: Feedback loops matter more than plans.**
-
-The people who win at ${keyphrase} aren't the ones with the best initial plan. They're the ones who adjust fastest based on what they learn.
-
-**Principle 3: Consistency compounds.**
-
-${detail}. But the compound effect of consistent, specific action over ${numbers[2] || "90 days"} is what creates the gap between average and exceptional.
-
-[IMAGE PROMPT 3]
-
 ## The Bottom Line
 
-${keyphrase} isn't complicated. It's just specific.
+${keyphrase} isn't complicated. It's specific.
 
-Stop looking for shortcuts. Start looking for signal in the data. Get specific about what you're measuring. Adjust faster than everyone else.
+Stop looking for shortcuts. Start looking for signal. Get specific about what you're measuring. Adjust faster than everyone else.
 
-That's not a hack. That's a system.`;
-}
+That's not a hack. That's a system.
 
-function buildArticleImagePrompts(keyphrase: string): string[] {
-  return [
-    `A conceptual image of a compass pointing specifically at "${keyphrase}" while generic landmarks blur in the background. Clean, modern illustration style with a warm color palette, suggesting precision and direction.`,
-    `A close-up of a dashboard showing specific metrics and KPIs related to ${keyphrase}, with one key metric highlighted in amber. The screen is sharp and clear against a blurred office background. Professional, data-driven aesthetic.`,
-    `An overhead view of a desk with a strategic plan laid out — sticky notes, a timeline, and a small plant suggesting growth. The plan is specific and actionable, not vague. Warm natural light, clean composition, editorial photography style.`,
-  ];
+[IMAGE PROMPT 3]`;
 }
 
 export function generateFullLinkedInResponse(videoInfo: VideoInfo): LinkedInResult {
-  const seed = hashCode(videoInfo.title + videoInfo.transcript.slice(0, 200));
-  const keyphrases = extractKeyPhrases(videoInfo.transcript);
+  const seed = hashCode(videoInfo.title + videoInfo.transcript.slice(0, 300));
+  const allSentences = extractSentences(videoInfo.transcript);
   const numbers = extractNumbers(videoInfo.transcript);
-  const sentences = extractSentences(videoInfo.transcript);
-  const primaryTopic = keyphrases[0] || "this approach";
-  const secondaryTopic = keyphrases[1] || "the strategy";
-  const thirdTopic = keyphrases[2] || "the process";
+  const keyphrases = extractKeyphrases(videoInfo.transcript);
+  const primaryTopic = keyphrases[0] || videoInfo.title || "this insight";
 
   const today = new Date();
   const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -201,34 +178,26 @@ export function generateFullLinkedInResponse(videoInfo: VideoInfo): LinkedInResu
     if (upcoming.length >= 5) break;
   }
 
-  const posts: LinkedInPost[] = [
-    {
-      hook: buildHook(primaryTopic, numbers),
-      body: buildPostBody(primaryTopic, pick(sentences, 3, seed), pick(numbers, 3, seed)),
-      imagePrompt: buildImagePrompt(primaryTopic),
-    },
-    {
-      hook: buildHook(secondaryTopic, numbers),
-      body: buildPostBody(secondaryTopic, pick(sentences, 3, seed + 1), pick(numbers, 3, seed + 1)),
-      imagePrompt: buildImagePrompt(secondaryTopic),
-    },
-    {
-      hook: buildHook(thirdTopic, numbers),
-      body: buildPostBody(thirdTopic, pick(sentences, 3, seed + 2), pick(numbers, 3, seed + 2)),
-      imagePrompt: buildImagePrompt(thirdTopic),
-    },
-    {
-      hook: buildHook(primaryTopic, numbers),
-      body: buildPostBody(primaryTopic, pick(sentences, 3, seed + 3), pick(numbers, 3, seed + 3)),
-      imagePrompt: buildImagePrompt(primaryTopic),
-    },
-  ];
+  const posts: LinkedInPost[] = [];
+  for (let i = 0; i < 4; i++) {
+    const topicSentences = pick(allSentences, 3, seed + i);
+    posts.push({
+      hook: buildHookFromTranscript(allSentences, numbers, seed + i),
+      body: buildPostBodyFromTranscript(topicSentences, allSentences, numbers, seed + i),
+      imagePrompt: buildImagePromptFromTranscript(topicSentences[0] || allSentences[0] || primaryTopic, primaryTopic),
+    });
+  }
 
+  const articleSentences = pick(allSentences, 5, seed + 10);
   const articles: LinkedInArticle[] = [
     {
-      title: buildArticleTitle(primaryTopic),
-      body: buildArticleBody(primaryTopic, pick(sentences, 3, seed + 4), pick(numbers, 3, seed + 4)),
-      imagePrompts: buildArticleImagePrompts(primaryTopic),
+      title: `${primaryTopic.charAt(0).toUpperCase() + primaryTopic.slice(1)}: What the Evidence Actually Shows`,
+      body: buildArticleBodyFromTranscript(primaryTopic, articleSentences, numbers),
+      imagePrompts: [
+        buildImagePromptFromTranscript(articleSentences[0] || "The core insight", primaryTopic),
+        buildImagePromptFromTranscript(articleSentences[2] || "The framework", primaryTopic),
+        buildImagePromptFromTranscript(articleSentences[4] || "The bottom line", primaryTopic),
+      ],
     },
   ];
 
@@ -238,26 +207,26 @@ export function generateFullLinkedInResponse(videoInfo: VideoInfo): LinkedInResu
       day: upcoming[0].day, date: upcoming[0].date, type: "post",
       title: posts[0].hook.slice(0, 60), contentIndex: 0,
       recommendedTime: "10:00-11:00 AM",
-      note: `${upcoming[0].day} mid-morning — high engagement window for data-driven posts`,
+      note: `${upcoming[0].day} mid-morning — high engagement window`,
     });
     calendar.push({
       day: upcoming[1].day, date: upcoming[1].date, type: "article",
       title: articles[0].title, contentIndex: 0,
       recommendedTime: "10:00 AM-12:00 PM",
-      note: `${upcoming[1].day} is the strongest day for long-form articles`,
+      note: `${upcoming[1].day} strongest day for long-form`,
     });
     calendar.push({
       day: upcoming[2].day, date: upcoming[2].date, type: "post",
       title: posts[1].hook.slice(0, 60), contentIndex: 1,
       recommendedTime: "11:00 AM-1:00 PM",
-      note: `${upcoming[2].day} mid-morning — practical, actionable content performs well`,
+      note: `${upcoming[2].day} mid-morning — actionable content`,
     });
     if (upcoming[3]) {
       calendar.push({
         day: upcoming[3].day, date: upcoming[3].date, type: "post",
         title: posts[2].hook.slice(0, 60), contentIndex: 2,
         recommendedTime: "11:00 AM",
-        note: `${upcoming[3].day} early — lighter, reflective tone for end of week`,
+        note: `${upcoming[3].day} lighter tone for end of week`,
       });
     }
   }
@@ -266,8 +235,16 @@ export function generateFullLinkedInResponse(videoInfo: VideoInfo): LinkedInResu
 }
 
 export function generateLocalVideoScript(videoInfo: VideoInfo): VideoScript {
-  const keyphrases = extractKeyPhrases(videoInfo.transcript);
-  const topic = keyphrases[0] || "this insight";
+  const sentences = extractSentences(videoInfo.transcript);
+  const keyphrases = extractKeyphrases(videoInfo.transcript);
+  const topic = keyphrases[0] || videoInfo.title || "this";
+
+  const hookSentence = sentences[0] || `Here's what most people get wrong about ${topic}`;
+  const problemSentence = sentences[1] || `The issue isn't effort — it's precision`;
+  const solutionSentences = sentences.slice(2, 5);
+  const solution = solutionSentences.length > 0
+    ? solutionSentences.join(". ")
+    : `Get specific about what success looks like. Measure outcomes, not activity. Build feedback loops that let you adjust fast.`;
 
   return {
     sections: [
@@ -275,7 +252,7 @@ export function generateLocalVideoScript(videoInfo: VideoInfo): VideoScript {
         label: "Hook",
         timestamp: "0:00",
         duration: "3 sec",
-        script: `Stop scrolling. This one thing about ${topic} changed everything for me.`,
+        script: hookSentence.length > 100 ? hookSentence.slice(0, 97) + "..." : hookSentence,
         visual: "Face to camera, direct eye contact, slight lean forward",
         caption: "STOP SCROLLING",
       },
@@ -283,25 +260,25 @@ export function generateLocalVideoScript(videoInfo: VideoInfo): VideoScript {
         label: "Problem",
         timestamp: "0:03",
         duration: "7 sec",
-        script: `Most people think ${topic} is about doing more. It's not. The problem isn't effort — it's precision. You're doing ${topic} without a system.`,
-        visual: "B-roll of someone looking frustrated at a screen, overwhelmed",
-        caption: "The problem isn't effort",
+        script: problemSentence,
+        visual: "B-roll of someone looking frustrated at a screen",
+        caption: "The real problem",
       },
       {
         label: "Solution",
         timestamp: "0:10",
         duration: "35 sec",
-        script: `Here's what actually works with ${topic}. Get specific about what success looks like. Measure the right things — not vanity metrics, outcome metrics. And build a feedback loop that lets you adjust fast. I changed my approach to ${topic} and the results compounded within weeks. Not because I worked harder. Because I stopped being vague.`,
-        visual: "Split screen: before (messy approach) vs after (structured system)",
-        caption: "Specificity beats volume",
+        script: solution,
+        visual: "Split screen: before vs after",
+        caption: "Here's what actually works",
       },
       {
         label: "CTA",
         timestamp: "0:45",
         duration: "15 sec",
-        script: `Try this for two weeks. Get specific, measure outcomes, adjust fast. Then tell me it doesn't work. Follow for more strategies backed by data, not guesswork.`,
+        script: `Try this and tell me it doesn't work. Follow for more.`,
         visual: "Point to follow button, then fade to profile",
-        caption: "Follow for data-backed tips",
+        caption: "Follow for more",
       },
     ],
     totalDuration: "60 seconds",
@@ -310,40 +287,46 @@ export function generateLocalVideoScript(videoInfo: VideoInfo): VideoScript {
 }
 
 export function generateLocalCarousel(videoInfo: VideoInfo): CarouselSlide[] {
-  const keyphrases = extractKeyPhrases(videoInfo.transcript);
+  const sentences = extractSentences(videoInfo.transcript);
+  const keyphrases = extractKeyphrases(videoInfo.transcript);
+  const topic = keyphrases[0] || videoInfo.title || "this";
+
   const slides: CarouselSlide[] = [];
 
+  const hookSentence = sentences[0] || `The truth about ${topic} nobody talks about`;
   slides.push({
     slideNumber: 1,
-    title: `The ${keyphrases[0] || "truth"} nobody talks about`,
-    body: `After studying ${keyphrases[0] || "this topic"} deeply, I found a pattern that changes everything. Swipe to see it.`,
-    notes: "Hook slide — bold title, curiosity-driven",
+    title: hookSentence.length > 50 ? hookSentence.slice(0, 47) + "..." : hookSentence,
+    body: `Swipe to see what the data actually shows about ${topic}.`,
+    notes: "Hook slide — bold, curiosity-driven",
   });
 
-  const insights = [
-    `${keyphrases[0] || "This approach"} works best when you get specific. Generic strategies produce generic results.`,
-    `The data shows that ${keyphrases[1] || "consistency"} matters more than intensity. Small, specific actions compound over time.`,
-    `Most people measure the wrong things. Track outcomes, not activity. That's where the real signal lives.`,
-    `The biggest mistake is treating ${keyphrases[0] || "this"} as optional. It's a system, not a one-time task.`,
-    `${keyphrases[2] || "Feedback loops"} are the secret weapon. The fastest learners aren't the smartest — they're the ones who adjust fastest.`,
-    `Here's the framework: Get specific. Measure outcomes. Adjust fast. Repeat. That's it.`,
-  ];
-
-  for (let i = 0; i < Math.min(insights.length, 6); i++) {
-    const parts = insights[i].split(". ");
+  const insightSentences = sentences.slice(1, 7);
+  for (let i = 0; i < Math.min(insightSentences.length, 6); i++) {
+    const s = insightSentences[i];
+    const parts = s.split(/[,;:]/);
     slides.push({
       slideNumber: i + 2,
       title: parts[0]?.slice(0, 50) || `Insight ${i + 1}`,
-      body: parts.slice(1).join(". ").slice(0, 150) || insights[i],
-      notes: `Key takeaway ${i + 1} — one idea per slide`,
+      body: parts.slice(1).join(". ").slice(0, 150) || s.slice(0, 150),
+      notes: `Key takeaway ${i + 1}`,
+    });
+  }
+
+  if (slides.length < 4) {
+    slides.push({
+      slideNumber: slides.length + 1,
+      title: `Why ${topic} matters`,
+      body: `The evidence is clear. ${topic} isn't optional — it's a system.`,
+      notes: "Supporting point",
     });
   }
 
   slides.push({
     slideNumber: slides.length + 1,
-    title: "Save this for later",
-    body: "Which insight resonated most? Drop a comment or save this carousel to revisit when you need it.",
-    notes: "CTA slide — encourage saves and comments",
+    title: "Save this",
+    body: `Which insight about ${topic} resonated most? Save this carousel to revisit later.`,
+    notes: "CTA slide",
   });
 
   return slides;
