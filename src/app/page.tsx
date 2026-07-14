@@ -151,6 +151,25 @@ function buildPlainText(result: LinkedInResult): string {
   return lines.join("\n");
 }
 
+function parseSSEOutput(raw: string): { type: "result"; result: LinkedInResult } | { type: "output"; output: string } | { type: "error" } {
+  let cleaned = raw.trim();
+  if (cleaned.startsWith("```")) cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
+  try {
+    const parsed = JSON.parse(cleaned);
+    if (parsed.posts && parsed.calendar) return { type: "result", result: parsed as LinkedInResult };
+  } catch { /* not JSON */ }
+  const jsonStart = cleaned.indexOf("{");
+  const jsonEnd = cleaned.lastIndexOf("}");
+  if (jsonStart !== -1 && jsonEnd > jsonStart) {
+    try {
+      const parsed = JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1));
+      if (parsed.posts && parsed.calendar) return { type: "result", result: parsed as LinkedInResult };
+    } catch { /* not JSON */ }
+  }
+  if (cleaned.length > 0) return { type: "output", output: cleaned };
+  return { type: "error" };
+}
+
 export default function Home() {
   const [appState, setAppState] = useState<AppState>("input");
   const [session, setSession] = useState<Session | null>(null);
@@ -297,7 +316,7 @@ export default function Home() {
           videoInfo: transcriptData,
           timezone,
           audience: "LinkedIn professionals",
-          stream: false,
+          stream: true,
           contentType: type,
         }),
       });
@@ -307,46 +326,87 @@ export default function Home() {
         throw new Error(errData.error || `Generation failed (status ${generateRes.status})`);
       }
 
-      const data = await generateRes.json();
-      if (data.result) {
-        const genResult = data.result as LinkedInResult;
-        setResult(genResult);
-        setVideoTitle(title);
-        setProcessingStage("done");
+      const contentTypeHeader = generateRes.headers.get("content-type") || "";
 
-        if (!session) {
-          const newCount = incrementTrialCount();
-          setTrialCount(newCount);
+      if (contentTypeHeader.includes("text/event-stream")) {
+        const reader = generateRes.body!.getReader();
+        const decoder = new TextDecoder();
+        let accumulated = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder.decode(value, { stream: true });
+          const lines = chunk.split("\n");
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || !trimmed.startsWith("data: ")) continue;
+            const data = trimmed.slice(6);
+            if (data === "[DONE]") continue;
+            try {
+              const parsed = JSON.parse(data);
+              if (typeof parsed.content === "string") accumulated += parsed.content;
+            } catch { /* skip */ }
+          }
         }
 
-        if (session) {
-          try {
-            await fetch("/api/calendar/save", {
-              method: "POST",
-              headers: getAuthHeaders(session),
-              body: JSON.stringify({
-                videoUrl: "",
-                videoTitle: title,
-                videoId: "",
-                transcript,
-                result: genResult,
-              }),
-            });
-          } catch { /* save failed, calendar still shows in-memory */ }
+        const parsed = parseSSEOutput(accumulated);
+        if (parsed.type === "result") {
+          const genResult = parsed.result as LinkedInResult;
+          setResult(genResult);
+          setVideoTitle(title);
+          setProcessingStage("done");
+
+          if (!session) { const newCount = incrementTrialCount(); setTrialCount(newCount); }
+
+          if (session) {
+            try {
+              await fetch("/api/calendar/save", {
+                method: "POST",
+                headers: getAuthHeaders(session),
+                body: JSON.stringify({ videoUrl: "", videoTitle: title, videoId: "", transcript, result: genResult }),
+              });
+            } catch { /* save failed */ }
+          }
+
+          setTimeout(() => setAppState("calendar"), 400);
+        } else if (parsed.type === "output") {
+          setPlainTextOutput(parsed.output);
+          setVideoTitle(title);
+          setProcessingStage("done");
+          if (!session) { const newCount = incrementTrialCount(); setTrialCount(newCount); }
+          setTimeout(() => setAppState("calendar"), 400);
+        } else {
+          throw new Error("Could not parse generated content. Please try again.");
         }
+      } else {
+        const data = await generateRes.json();
+        if (data.result) {
+          const genResult = data.result as LinkedInResult;
+          setResult(genResult);
+          setVideoTitle(title);
+          setProcessingStage("done");
 
-        setTimeout(() => setAppState("calendar"), 400);
-      } else if (data.output) {
-        setPlainTextOutput(data.output);
-        setVideoTitle(title);
-        setProcessingStage("done");
+          if (!session) { const newCount = incrementTrialCount(); setTrialCount(newCount); }
 
-        if (!session) {
-          const newCount = incrementTrialCount();
-          setTrialCount(newCount);
+          if (session) {
+            try {
+              await fetch("/api/calendar/save", {
+                method: "POST",
+                headers: getAuthHeaders(session),
+                body: JSON.stringify({ videoUrl: "", videoTitle: title, videoId: "", transcript, result: genResult }),
+              });
+            } catch { /* save failed */ }
+          }
+
+          setTimeout(() => setAppState("calendar"), 400);
+        } else if (data.output) {
+          setPlainTextOutput(data.output);
+          setVideoTitle(title);
+          setProcessingStage("done");
+          if (!session) { const newCount = incrementTrialCount(); setTrialCount(newCount); }
+          setTimeout(() => setAppState("calendar"), 400);
         }
-
-        setTimeout(() => setAppState("calendar"), 400);
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
@@ -590,6 +650,7 @@ export default function Home() {
               session={session}
               script={script}
               carouselSlides={carouselSlides}
+              loading={loading}
               onRegenerate={handleRegenerate}
               onCopyAll={handleCopyAll}
               onDownloadTxt={handleDownloadTxt}

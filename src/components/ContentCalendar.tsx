@@ -28,6 +28,7 @@ export default function ContentCalendar({
   session,
   script,
   carouselSlides,
+  loading,
   onRegenerate,
   onCopyAll,
   onDownloadTxt,
@@ -41,6 +42,7 @@ export default function ContentCalendar({
   session: Session | null;
   script: VideoScript | null;
   carouselSlides: CarouselSlide[] | null;
+  loading: boolean;
   onRegenerate: (type: "post" | "article", index: number) => void;
   onCopyAll: () => void;
   onDownloadTxt: () => void;
@@ -226,10 +228,16 @@ export default function ContentCalendar({
               <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>Turn this video into a 60-second Reel, TikTok, or Short</p>
               <button
                 onClick={onGenerateScript}
-                className="text-xs font-medium px-4 py-2 rounded-lg transition-colors"
+                disabled={loading}
+                className="text-xs font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-60"
                 style={{ background: "var(--accent)", color: "white" }}
               >
-                Generate script
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2a10 10 0 019.95 9" /></svg>
+                    Generating...
+                  </span>
+                ) : "Generate script"}
               </button>
             </div>
           )}
@@ -249,10 +257,16 @@ export default function ContentCalendar({
               <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>10-slide PDF carousel — 6x more engagement than text posts</p>
               <button
                 onClick={onGenerateCarousel}
-                className="text-xs font-medium px-4 py-2 rounded-lg transition-colors"
+                disabled={loading}
+                className="text-xs font-medium px-4 py-2 rounded-lg transition-colors disabled:opacity-60"
                 style={{ background: "var(--accent)", color: "white" }}
               >
-                Generate carousel
+                {loading ? (
+                  <span className="flex items-center gap-2">
+                    <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2a10 10 0 019.95 9" /></svg>
+                    Generating...
+                  </span>
+                ) : "Generate carousel"}
               </button>
             </div>
           )}

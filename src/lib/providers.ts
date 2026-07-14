@@ -37,7 +37,7 @@ function isProviderCoolingDown(providerId: string): boolean {
   return true;
 }
 
-export const FETCH_TIMEOUT_MS = 25_000;
+export const FETCH_TIMEOUT_MS = 12_000;
 
 export async function fetchWithTimeout(
   url: string,
