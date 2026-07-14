@@ -8,19 +8,10 @@ import TranscriptInput from "@/components/TranscriptInput";
 import ProcessingStages from "@/components/ProcessingStages";
 import ContentCalendar from "@/components/ContentCalendar";
 import AuthScreen from "@/components/AuthScreen";
-import ModelSelector from "@/components/ModelSelector";
 
 import VideosLibrary from "@/components/VideosLibrary";
 import ReferralBanner from "@/components/ReferralBanner";
 import { TRIAL_LIMIT } from "@/lib/constants";
-
-interface ModelOption {
-  providerId: string;
-  providerLabel: string;
-  tagline: string;
-  modelId: string;
-  modelLabel: string;
-}
 
 const TIMEZONE_KEY = "link2post_timezone";
 const TRIAL_KEY = "link2post_trials";
@@ -174,8 +165,6 @@ export default function Home() {
   });
   const [showSignupWall, setShowSignupWall] = useState(false);
   const [supabase] = useState(() => getSupabaseBrowser());
-  const [modelOptions, setModelOptions] = useState<ModelOption[]>([]);
-  const [selectedModel, setSelectedModel] = useState<{ providerId: string; modelId: string } | null>(null);
   const [processingStage, setProcessingStage] = useState<ProcessingStage>("generating");
   const [script, setScript] = useState<VideoScript | null>(null);
   const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[] | null>(null);
@@ -185,14 +174,6 @@ export default function Home() {
   const abortRef = useRef(false);
 
   useEffect(() => {
-    fetch("/api/models")
-      .then((r) => r.json())
-      .then((data) => {
-        setModelOptions(data.options || []);
-        if (data.default) setSelectedModel(data.default);
-      })
-      .catch(() => {});
-
     const params = new URLSearchParams(window.location.search);
     const ref = params.get("ref");
     if (ref) {
@@ -316,8 +297,6 @@ export default function Home() {
           videoInfo: transcriptData,
           timezone,
           audience: "LinkedIn professionals",
-          provider: selectedModel?.providerId,
-          model: selectedModel?.modelId,
           stream: false,
           contentType: type,
         }),
@@ -386,7 +365,7 @@ export default function Home() {
       const res = await fetch("/api/regenerate", {
         method: "POST",
         headers: getAuthHeaders(session),
-        body: JSON.stringify({ type, sourceContent: JSON.stringify(item), videoTitle, provider: selectedModel?.providerId, model: selectedModel?.modelId, stream: false }),
+        body: JSON.stringify({ type, sourceContent: JSON.stringify(item), videoTitle, stream: false }),
       });
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}));
@@ -452,8 +431,6 @@ export default function Home() {
         headers: getAuthHeaders(session),
         body: JSON.stringify({
           videoInfo,
-          provider: selectedModel?.providerId,
-          model: selectedModel?.modelId,
         }),
       });
       if (!res.ok) {
@@ -484,8 +461,6 @@ export default function Home() {
         headers: getAuthHeaders(session),
         body: JSON.stringify({
           videoInfo,
-          provider: selectedModel?.providerId,
-          model: selectedModel?.modelId,
         }),
       });
       if (!res.ok) {
@@ -561,13 +536,6 @@ export default function Home() {
               <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>
                 Works with any transcript — YouTube, podcasts, interviews, lectures.
               </p>
-              {modelOptions.length > 1 && (
-                <ModelSelector
-                  options={modelOptions}
-                  selected={selectedModel}
-                  onSelect={(providerId, modelId) => setSelectedModel({ providerId, modelId })}
-                />
-              )}
             </div>
 
             {!session && trialsRemaining > 0 && trialsRemaining < TRIAL_LIMIT && (
