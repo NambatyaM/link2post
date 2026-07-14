@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { SYSTEM_PROMPT, buildYouTubePrompt } from "@/lib/prompts";
+import { SYSTEM_PROMPT, PROMPTS, buildYouTubePrompt } from "@/lib/prompts";
 import { checkRateLimit, getRateLimitHeaders, recordGeneration } from "@/lib/rate-limit";
 import { verifyToken, extractBearerToken } from "@/lib/auth";
 import { validateLinkedInResult, type ValidationError } from "@/lib/validate";
@@ -7,7 +7,7 @@ import { PROVIDERS, buildAttempts, fetchWithTimeout, recordProviderFailure, clea
 import { generateFullLinkedInResponse } from "@/lib/local-generator";
 import { createThinkingFilter } from "@/lib/thinking-filter";
 import { recordGenerationEvent } from "@/lib/analytics";
-import type { VideoInfo, LinkedInResult } from "@/lib/types";
+import type { VideoInfo, LinkedInResult, ContentType } from "@/lib/types";
 
 async function streamCompletion(
   systemPrompt: string,
@@ -176,13 +176,14 @@ Return the complete corrected JSON response now.`;
 
 export async function POST(req: NextRequest) {
   try {
-    const { videoInfo, timezone, audience, provider: providerId, model: modelId, stream: wantStream } = await req.json() as {
+    const { videoInfo, timezone, audience, provider: providerId, model: modelId, stream: wantStream, contentType } = await req.json() as {
       videoInfo: VideoInfo;
       timezone: string;
       audience?: string;
       provider?: string;
       model?: string;
       stream?: boolean;
+      contentType?: ContentType;
     };
 
     if (!videoInfo?.transcript || videoInfo.transcript.length < 100) {
@@ -217,6 +218,66 @@ export async function POST(req: NextRequest) {
 
     await recordGeneration({ userId, deviceId }).catch(() => {});
 
+    // --- Plain text dispatch for carousel and script ---
+    if (contentType === "carousel" || contentType === "script") {
+      const prompt = PROMPTS[contentType].replace("{transcript}", videoInfo.transcript);
+      const attempts = buildAttempts(providerId, modelId);
+
+      if (attempts.length === 0) {
+        return Response.json(
+          { error: "No AI providers available. Please try again." },
+          { status: 503 },
+        );
+      }
+
+      const genStart = Date.now();
+      for (const attempt of attempts) {
+        try {
+          const response = await fetchWithTimeout(attempt.provider.baseUrl, {
+            method: "POST",
+            headers: { Authorization: `Bearer ${attempt.apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: attempt.model,
+              messages: [{ role: "user", content: prompt }],
+              temperature: 0.7,
+              max_tokens: 4000,
+              stream: false,
+            }),
+          });
+
+          if (!response.ok) {
+            recordProviderFailure(attempt.provider.id);
+            continue;
+          }
+          clearProviderCooldown(attempt.provider.id);
+
+          const data = await response.json();
+          const content = data.choices?.[0]?.message?.content;
+          if (typeof content !== "string" || content.trim().length === 0) continue;
+
+          const durationMs = Date.now() - genStart;
+          recordGenerationEvent({
+            userId, deviceId, generationType: contentType,
+            providerId: attempt.provider.id, modelId: attempt.model, success: true, durationMs,
+          }).catch(() => {});
+
+          return Response.json({ output: content }, { headers: getRateLimitHeaders(rateResult) });
+        } catch { continue; }
+      }
+
+      const durationMs = Date.now() - genStart;
+      recordGenerationEvent({
+        userId, deviceId, generationType: contentType,
+        providerId: "none", modelId: "none", success: false, durationMs,
+      }).catch(() => {});
+
+      return Response.json(
+        { error: "Generation failed. Please try again." },
+        { status: 500 },
+      );
+    }
+
+    // --- Existing JSON flow for post / article (or no contentType) ---
     const genStart = Date.now();
 
     if (wantStream === false) {

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Session } from "@supabase/supabase-js";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
-import type { LinkedInResult, LinkedInPost, LinkedInArticle, VideoScript, VideoInfo, CarouselSlide } from "@/lib/types";
+import type { LinkedInResult, LinkedInPost, LinkedInArticle, VideoScript, VideoInfo, CarouselSlide, ContentType } from "@/lib/types";
 import TranscriptInput from "@/components/TranscriptInput";
 import ProcessingStages from "@/components/ProcessingStages";
 import ContentCalendar from "@/components/ContentCalendar";
@@ -55,6 +55,13 @@ function incrementTrialCount(): number {
 
 type AppState = "input" | "processing" | "calendar" | "library";
 type ProcessingStage = "generating" | "done";
+
+const CONTENT_TYPE_LABELS: Record<ContentType, string> = {
+  post: "LinkedIn Post",
+  carousel: "Carousel",
+  article: "Article",
+  script: "Video Script",
+};
 
 function getAuthHeaders(session: Session | null): Record<string, string> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
@@ -173,6 +180,8 @@ export default function Home() {
   const [script, setScript] = useState<VideoScript | null>(null);
   const [carouselSlides, setCarouselSlides] = useState<CarouselSlide[] | null>(null);
   const [videoInfo, setVideoInfo] = useState<VideoInfo | null>(null);
+  const [contentType, setContentType] = useState<ContentType>("post");
+  const [plainTextOutput, setPlainTextOutput] = useState<string | null>(null);
   const abortRef = useRef(false);
 
   useEffect(() => {
@@ -274,7 +283,7 @@ export default function Home() {
   const trialsRemaining = Math.max(0, TRIAL_LIMIT - trialCount);
   const isTrialExhausted = !session && trialsRemaining <= 0;
 
-  const handleGenerate = async (title: string, transcript: string) => {
+  const handleGenerate = async (title: string, transcript: string, type: ContentType) => {
     if (isTrialExhausted) {
       setShowSignupWall(true);
       return;
@@ -285,6 +294,8 @@ export default function Home() {
     setProcessingStage("generating");
     setAppState("processing");
     abortRef.current = false;
+    setContentType(type);
+    setPlainTextOutput(null);
 
     const transcriptData: VideoInfo = {
       title,
@@ -308,6 +319,7 @@ export default function Home() {
           provider: selectedModel?.providerId,
           model: selectedModel?.modelId,
           stream: false,
+          contentType: type,
         }),
       });
 
@@ -342,6 +354,17 @@ export default function Home() {
               }),
             });
           } catch { /* save failed, calendar still shows in-memory */ }
+        }
+
+        setTimeout(() => setAppState("calendar"), 400);
+      } else if (data.output) {
+        setPlainTextOutput(data.output);
+        setVideoTitle(title);
+        setProcessingStage("done");
+
+        if (!session) {
+          const newCount = incrementTrialCount();
+          setTrialCount(newCount);
         }
 
         setTimeout(() => setAppState("calendar"), 400);
@@ -604,8 +627,45 @@ export default function Home() {
               onDownloadTxt={handleDownloadTxt}
               onGenerateScript={handleGenerateScript}
               onGenerateCarousel={handleGenerateCarousel}
-              onNewVideo={() => { setAppState("input"); setResult(null); setVideoTitle(""); setScript(null); setCarouselSlides(null); setVideoInfo(null); }}
+              onNewVideo={() => { setAppState("input"); setResult(null); setVideoTitle(""); setScript(null); setCarouselSlides(null); setVideoInfo(null); setPlainTextOutput(null); }}
             />
+          </div>
+        )}
+
+        {appState === "calendar" && plainTextOutput && !result && (
+          <div className="w-full max-w-[768px] mx-auto">
+            {session && <ReferralBanner session={session} />}
+            <div className="rounded-2xl p-6" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                  {CONTENT_TYPE_LABELS[contentType]}
+                </h2>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(plainTextOutput).catch(() => {});
+                    }}
+                    className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+                    style={{ border: "1px solid var(--border)", color: "var(--text-muted)" }}
+                  >
+                    Copy
+                  </button>
+                  <button
+                    onClick={() => { setAppState("input"); setResult(null); setPlainTextOutput(null); setVideoTitle(""); setVideoInfo(null); }}
+                    className="text-xs px-3 py-1.5 rounded-lg transition-colors"
+                    style={{ border: "1px solid var(--border)", color: "var(--text-muted)" }}
+                  >
+                    New content
+                  </button>
+                </div>
+              </div>
+              <div
+                className="text-sm whitespace-pre-wrap leading-relaxed"
+                style={{ color: "var(--text-primary)" }}
+              >
+                {plainTextOutput}
+              </div>
+            </div>
           </div>
         )}
 

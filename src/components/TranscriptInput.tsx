@@ -1,16 +1,25 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import type { ContentType } from "@/lib/types";
+
+const CONTENT_TYPES: { value: ContentType; label: string }[] = [
+  { value: "post", label: "Post" },
+  { value: "carousel", label: "Carousel" },
+  { value: "article", label: "Article" },
+  { value: "script", label: "Video Script" },
+];
 
 export default function TranscriptInput({
   onSubmit,
   isLoading,
 }: {
-  onSubmit: (title: string, transcript: string) => void;
+  onSubmit: (title: string, transcript: string, contentType: ContentType) => void;
   isLoading: boolean;
 }) {
   const [transcript, setTranscript] = useState("");
   const [title, setTitle] = useState("");
+  const [contentType, setContentType] = useState<ContentType>("post");
   const [error, setError] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -33,7 +42,7 @@ export default function TranscriptInput({
       return;
     }
     setError("");
-    onSubmit(title.trim() || "Untitled video", trimmed);
+    onSubmit(title.trim() || "Untitled video", trimmed, contentType);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -47,6 +56,24 @@ export default function TranscriptInput({
 
   return (
     <form onSubmit={handleSubmit} className="w-full flex flex-col gap-2.5">
+      <div className="flex gap-1.5 flex-wrap">
+        {CONTENT_TYPES.map((ct) => (
+          <button
+            key={ct.value}
+            type="button"
+            onClick={() => setContentType(ct.value)}
+            disabled={isLoading}
+            className="px-3 py-1 rounded-full text-xs font-medium transition-colors disabled:opacity-50"
+            style={{
+              background: contentType === ct.value ? "var(--accent)" : "var(--bg-tertiary)",
+              color: contentType === ct.value ? "white" : "var(--text-muted)",
+              border: `1px solid ${contentType === ct.value ? "var(--accent)" : "var(--border-light)"}`,
+            }}
+          >
+            {ct.label}
+          </button>
+        ))}
+      </div>
       <input
         type="text"
         value={title}

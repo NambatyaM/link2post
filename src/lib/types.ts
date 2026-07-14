@@ -36,7 +36,7 @@ export interface VideoInfo {
   videoId: string;
 }
 
-export type ContentType = "post" | "article";
+export type ContentType = "post" | "article" | "carousel" | "script";
 
 export interface VideoScriptSection {
   label: string;
