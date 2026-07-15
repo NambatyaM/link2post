@@ -2,6 +2,10 @@ export interface LinkedInPost {
   hook: string;
   body: string;
   imagePrompt: string;
+  viralityScore?: number;
+  authorityScore?: number;
+  commentPotential?: number;
+  readabilityScore?: number;
 }
 
 export interface LinkedInArticle {
@@ -38,6 +42,41 @@ export interface VideoInfo {
 
 export type ContentType = "post" | "article" | "carousel" | "script";
 
+export type PostStatus = "draft" | "approved" | "archived";
+
+export type ProjectStatus = "processing" | "completed" | "failed";
+
+export type SubscriptionTier = "free" | "pro" | "business";
+
+export interface VoiceProfile {
+  tone: string[];
+  avgSentenceLength: "short" | "medium" | "long";
+  formattingStyle: string[];
+  vocabularyTraits: string[];
+  commonPhrases: string[];
+  favoriteEmojis: string[];
+}
+
+export interface Project {
+  id: string;
+  userId: string;
+  title: string;
+  rawTranscript: string;
+  status: ProjectStatus;
+  createdAt: string;
+}
+
+export interface Post {
+  id: string;
+  projectId: string;
+  content: string;
+  postType: "story" | "educational" | "listicle" | "framework" | "case_study";
+  viralityScore: number;
+  imagePrompt: string;
+  status: PostStatus;
+  scheduledDate: string | null;
+}
+
 export interface VideoScriptSection {
   label: string;
   timestamp: string;
@@ -68,10 +107,11 @@ export interface PostingTimeSlot {
 }
 
 export const POSTING_SCHEDULE: PostingTimeSlot[] = [
-  { day: "Tuesday", window: "10:00–11:00 AM", bestFor: "Posts, polls", note: "Mid-morning engagement peak" },
-  { day: "Wednesday", window: "10:00 AM–12:00 PM or 4:00 PM", bestFor: "Articles, strongest post", note: "Highest consistent performer across datasets" },
-  { day: "Thursday", window: "10:00 AM–1:00 PM", bestFor: "Posts, case studies", note: "Strong mid-morning window" },
-  { day: "Friday", window: "11:00 AM (early only)", bestFor: "Lighter, personal tone", note: "Engagement drops after midday" },
+  { day: "Monday", window: "10:00-11:00 AM", bestFor: "Broad Appeal / Motivation / Story", note: "Start the week with inspiration" },
+  { day: "Tuesday", window: "10:00-11:00 AM", bestFor: "Educational / Framework", note: "Mid-morning engagement peak" },
+  { day: "Wednesday", window: "10:00 AM-12:00 PM", bestFor: "Case Study / Data / Contrarian", note: "Highest consistent performer" },
+  { day: "Thursday", window: "10:00 AM-1:00 PM", bestFor: "Listicle / Resource", note: "Strong mid-morning window" },
+  { day: "Friday", window: "11:00 AM", bestFor: "Personal / Reflection / Soft CTA", note: "Engagement drops after midday" },
 ];
 
 export const TIMEZONE_OPTIONS = [
@@ -87,6 +127,23 @@ export const TIMEZONE_OPTIONS = [
   { value: "Asia/Tokyo", label: "JST / Tokyo" },
   { value: "Africa/Nairobi", label: "EAT / Nairobi" },
   { value: "Africa/Lagos", label: "WAT / Lagos" },
-  { value: "America/Sao_Paulo", label: "BRT / São Paulo" },
+  { value: "America/Sao_Paulo", label: "BRT / Sao Paulo" },
   { value: "Australia/Sydney", label: "AEST / Sydney" },
+];
+
+export const NICHE_OPTIONS = [
+  "SaaS / Tech",
+  "Coaching / Consulting",
+  "Marketing / Agency",
+  "Startup / Founder",
+  "Finance / Investing",
+  "Health / Wellness",
+  "Education / Creator",
+  "Real Estate",
+  "E-commerce / DTC",
+  "AI / Machine Learning",
+  "Leadership / Management",
+  "Sales / B2B",
+  "Design / Creative",
+  "Other",
 ];

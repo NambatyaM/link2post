@@ -13,7 +13,6 @@ export interface Provider {
 }
 
 const PROVIDER_COOLDOWN_MS = 60_000;
-// eslint-disable-next-line no-undef
 const providerFailures: Map<string, number> = (typeof globalThis !== "undefined" && (globalThis as Record<string, unknown>).__providerFailures as Map<string, number>) || new Map();
 if (typeof globalThis !== "undefined") {
   (globalThis as Record<string, unknown>).__providerFailures = providerFailures;

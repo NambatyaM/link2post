@@ -3,7 +3,7 @@ import { SYSTEM_PROMPT, PROMPTS, buildYouTubePrompt } from "@/lib/prompts";
 import { checkRateLimit, getRateLimitHeaders, recordGeneration } from "@/lib/rate-limit";
 import { verifyToken, extractBearerToken } from "@/lib/auth";
 import { validateLinkedInResult, type ValidationError } from "@/lib/validate";
-import { PROVIDERS, buildAttempts, fetchWithTimeout, recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
+import { buildAttempts, fetchWithTimeout, recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
 import { generateFullLinkedInResponse } from "@/lib/local-generator";
 import { createThinkingFilter } from "@/lib/thinking-filter";
 import { recordGenerationEvent } from "@/lib/analytics";

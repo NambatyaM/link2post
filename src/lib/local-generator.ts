@@ -92,7 +92,7 @@ function buildPostBodyFromTranscript(
 
 function buildImagePromptFromTranscript(sentence: string, keyphrase: string): string {
   const shortSentence = sentence.length > 60 ? sentence.slice(0, 57) + "..." : sentence;
-  return `A clean, minimal visual showing: "${shortSentence}" — modern editorial style, warm tones, professional LinkedIn aesthetic, slight depth of field, text overlay with the key insight.`;
+  return `A clean, minimal visual showing: "${shortSentence}" — centered on the theme of "${keyphrase}", modern editorial style, warm tones, professional LinkedIn aesthetic, slight depth of field, text overlay with the key insight.`;
 }
 
 function buildArticleBodyFromTranscript(
