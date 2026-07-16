@@ -133,3 +133,23 @@ export function downloadFile(content: string, filename: string, mimeType: string
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
+
+export { exportToPdf, downloadPdf } from "@/lib/export-pdf";
+export { exportToDocx, downloadDocx } from "@/lib/export-docx";
+export { exportToExcel, downloadExcel } from "@/lib/export-excel";
+export { exportToZip, downloadZip } from "@/lib/export-zip";
+
+export function downloadAllFormats(
+  result: LinkedInResult,
+  filename?: string,
+): void {
+  const name = filename ?? "linkedin-export";
+
+  downloadFile(exportToTxt(result), `${name}.txt`, "text/plain");
+  downloadFile(exportToCsv(result), `${name}.csv`, "text/csv");
+  downloadFile(exportToMarkdown(result), `${name}.md`, "text/markdown");
+
+  console.info(
+    `[Export] TXT, CSV, and Markdown downloaded. For additional formats use downloadPdf(), downloadDocx(), downloadExcel(), or downloadZip().`,
+  );
+}

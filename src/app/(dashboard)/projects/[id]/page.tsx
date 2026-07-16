@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import type { Project, LinkedInPost } from "@/lib/types";
 import PostEditor from "@/components/features/PostEditor";
+import ExportToolbar from "@/components/features/ExportToolbar";
 
 interface ProjectDetail extends Project {
   posts: LinkedInPost[];
@@ -158,6 +159,7 @@ function ProjectContent({ projectId }: { projectId: string }) {
             {saveMessage}
           </span>
         )}
+        <ExportToolbar project={project} posts={posts} />
       </div>
 
       <div className="flex flex-1 overflow-hidden">

@@ -69,6 +69,7 @@ export default function OnboardingPage() {
   const [showFallback, setShowFallback] = useState(false);
 
   // Hydrate from localStorage on mount
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- Hydrating from localStorage on mount is safe
   useEffect(() => {
     const saved = loadSaved();
     if (saved?.completed) {

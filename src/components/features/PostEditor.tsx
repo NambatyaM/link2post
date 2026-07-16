@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import type { LinkedInPost } from "@/lib/types";
 import ImagePromptCard from "./ImagePromptCard";
+import RichTextEditor from "./RichTextEditor";
 
 interface PostEditorProps {
   post: LinkedInPost;
@@ -27,6 +28,10 @@ function getCharCountLabel(count: number) {
   if (count > 1300 && count <= 1400) return "Slightly long";
   if (count < 900) return "Too short";
   return "Too long";
+}
+
+function stripHtml(html: string) {
+  return html.replace(/<[^>]*>/g, "").trim();
 }
 
 function getScoreColor(score: number) {
@@ -75,50 +80,14 @@ function LinkedInPreview({ hook, body }: { hook: string; body: string }) {
   );
 }
 
-function Toolbar({ onAction }: { onAction: (action: string) => void }) {
-  const buttons = [
-    { label: "B", action: "bold", title: "Bold" },
-    { label: "I", action: "italic", title: "Italic" },
-    { label: "Emoji", action: "emoji", title: "Add Emoji" },
-  ];
-
-  return (
-    <div className="flex items-center gap-1">
-      {buttons.map((btn) => (
-        <button
-          key={btn.action}
-          onClick={() => onAction(btn.action)}
-          className="px-2.5 py-1 rounded text-xs font-medium transition-colors"
-          style={{ color: "var(--text-muted)", background: "var(--bg-tertiary)" }}
-          title={btn.title}
-        >
-          {btn.action === "bold" ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M6 4h8a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z" />
-              <path d="M6 12h9a4 4 0 0 1 4 4 4 4 0 0 1-4 4H6z" />
-            </svg>
-          ) : btn.action === "italic" ? (
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="19" y1="4" x2="10" y2="4" />
-              <line x1="14" y1="20" x2="5" y2="20" />
-              <line x1="15" y1="4" x2="9" y2="20" />
-            </svg>
-          ) : (
-            <span>😀</span>
-          )}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 export default function PostEditor({ post, index, onUpdate, onSave, onApprove, onDiscard }: PostEditorProps) {
   const [previewMode, setPreviewMode] = useState<PreviewMode>("edit");
   const [hook, setHook] = useState(post.hook);
   const [body, setBody] = useState(post.body);
   const [copied, setCopied] = useState(false);
 
-  const totalChars = hook.length + body.length + (hook && body ? 2 : 0);
+  const bodyPlainText = stripHtml(body);
+  const totalChars = hook.length + bodyPlainText.length + (hook && bodyPlainText ? 2 : 0);
   const charColor = getCharCountColor(totalChars);
   const charLabel = getCharCountLabel(totalChars);
 
@@ -134,17 +103,15 @@ export default function PostEditor({ post, index, onUpdate, onSave, onApprove, o
     [post, index, hook, body, onUpdate]
   );
 
-  const handleToolbar = useCallback(
-    (action: string) => {
-      if (action === "bold") {
-        handleChange("body", body + "**bold text**");
-      } else if (action === "italic") {
-        handleChange("body", body + "_italic text_");
-      } else if (action === "emoji") {
-        handleChange("body", body + " ");
-      }
+  const handleBodyChange = useCallback(
+    (html: string, _plainText: string) => {
+      setBody(html);
+      const plainBody = stripHtml(html);
+      const updatedHook = hook;
+      onUpdate(index, { ...post, hook: updatedHook, body: html });
+      void plainBody;
     },
-    [body, handleChange]
+    [post, index, hook, onUpdate]
   );
 
   const handleCopyPrompt = useCallback(() => {
@@ -218,11 +185,7 @@ export default function PostEditor({ post, index, onUpdate, onSave, onApprove, o
       ) : (
         <div className="flex flex-col gap-4">
           <div className="rounded-xl overflow-hidden" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
-            <div className="flex items-center justify-between px-4 pt-3">
-              <Toolbar onAction={handleToolbar} />
-            </div>
-
-            <div className="px-4 pb-2 pt-2">
+            <div className="px-4 pb-2 pt-3">
               <input
                 type="text"
                 value={hook}
@@ -232,18 +195,13 @@ export default function PostEditor({ post, index, onUpdate, onSave, onApprove, o
                 style={{ color: "var(--text-primary)" }}
               />
             </div>
-
-            <div className="px-4 pb-3">
-              <textarea
-                value={body}
-                onChange={(e) => handleChange("body", e.target.value)}
-                placeholder="Write your post body here..."
-                className="w-full text-sm px-0 py-1 outline-none resize-none bg-transparent leading-relaxed"
-                style={{ color: "var(--text-primary)", minHeight: "160px" }}
-                rows={8}
-              />
-            </div>
           </div>
+
+          <RichTextEditor
+            content={body}
+            onChange={handleBodyChange}
+            placeholder="Write your post body here..."
+          />
 
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2">

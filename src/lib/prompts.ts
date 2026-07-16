@@ -459,10 +459,21 @@ Transcript:
 // HELPER FUNCTIONS
 // ============================================================================
 
+export function getGeneratePrompt(
+  contentType: ContentType,
+  transcript: string,
+  voiceMemoryContext?: string,
+): string {
+  const base = PROMPTS[contentType].replace("{transcript}", transcript);
+  if (!voiceMemoryContext) return base;
+  return `${voiceMemoryContext}\n\n${base}`;
+}
+
 export function buildYouTubePrompt(
   videoInfo: VideoInfo,
   timezone: string,
   audience?: string,
+  voiceMemoryContext?: string,
 ): string {
   const scheduleStr = POSTING_SCHEDULE.map(
     (s) => `${s.day}: ${s.window} — Best for: ${s.bestFor} (${s.note})`,
@@ -493,7 +504,7 @@ ${videoInfo.title}
 ---VIDEO DESCRIPTION---
 ${videoInfo.description.slice(0, 500)}
 
----VIDEO TRANSCRIPT---
+${voiceMemoryContext ? `${voiceMemoryContext}\n\n` : ""}---VIDEO TRANSCRIPT---
 ${videoInfo.transcript.slice(0, 15000)}
 
 ---POSTING SCHEDULE (research-based)---
