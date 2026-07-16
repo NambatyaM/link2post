@@ -62,7 +62,7 @@ export default function CarouselEditor({ initialSlides, projectTitle, onExport }
 
   const deleteSlide = useCallback((index: number) => {
     if (slides.length <= 1) return;
-    setSlides((prev) => prev.filter((_, i) => i !== index).map((s, i) => ({ ...s, slideNumber: i + 1 }));
+    setSlides((prev) => prev.filter((_, i) => i !== index).map((s, i) => ({ ...s, slideNumber: i + 1 })));
     setActiveSlide((prev) => Math.min(prev, slides.length - 2));
   }, [slides.length]);
 
