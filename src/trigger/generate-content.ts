@@ -10,6 +10,7 @@ interface GenerateContentPayload {
   userId: string;
   niche?: string;
   audience?: string;
+  voiceProfilePrompt?: string;
 }
 
 async function updateProgress(step: string, progress: number, message: string) {
@@ -21,7 +22,7 @@ export const generateContentTask = task({
   id: "generate-content",
   maxDuration: 300,
   run: async (payload: GenerateContentPayload, { ctx: _ctx }) => {
-    const { projectId, userId, niche: _niche, audience } = payload;
+    const { projectId, userId, niche: _niche, audience, voiceProfilePrompt } = payload;
     const supabase = getSupabaseServer();
 
     // Step 1: Fetch project from Supabase
@@ -53,7 +54,7 @@ export const generateContentTask = task({
     // Step 2: Build the prompt
     await updateProgress("build_prompt", 15, "Building AI prompt");
 
-    const userPrompt = buildYouTubePrompt(videoInfo, "UTC", audience);
+    const userPrompt = buildYouTubePrompt(videoInfo, "UTC", audience, voiceProfilePrompt);
 
     // Step 3: Call the AI provider
     await updateProgress("call_ai", 25, "Calling AI provider");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
 type Tab = "profile" | "voice" | "billing" | "api";
@@ -21,24 +22,29 @@ interface UserProfile {
 
 interface VoiceData {
   tone: string[];
-  avgSentenceLength: string;
+  personality: string;
+  vocabulary: string[];
+  sentenceLength: string;
+  ctaStyle: string;
+  storytellingStyle: string;
+  contentPillars: string[];
+  targetAudience: string;
   formattingStyle: string[];
-  vocabularyTraits: string[];
   commonPhrases: string[];
   favoriteEmojis: string[];
 }
 
 const MOCK_VOICE: VoiceData = {
   tone: ["Conversational", "Authoritative", "Empathetic"],
-  avgSentenceLength: "medium",
-  formattingStyle: ["Line breaks", "Single emoji per post", "Question hooks"],
-  vocabularyTraits: ["Jargon-free", "Direct", "Storytelling"],
-  commonPhrases: [
-    "Here's what I learned",
-    "The truth is",
-    "I used to think...",
-    "Let me explain",
-  ],
+  personality: "A natural storyteller who blends personal experience with actionable insights. Writes with warmth but isn't afraid to be direct.",
+  vocabulary: ["Jargon-free", "Direct", "Storytelling", "Data-informed"],
+  sentenceLength: "medium",
+  ctaStyle: "Ends with thought-provoking questions that invite genuine debate, never generic engagement bait.",
+  storytellingStyle: "First-person narrative with personal anecdotes, specific numbers, and named examples.",
+  contentPillars: ["Leadership lessons", "Startup failures", "AI trends", "Team building"],
+  targetAudience: "Founders and CTOs at 10-100 person SaaS companies",
+  formattingStyle: ["1-2 sentences per paragraph", "Line breaks between thoughts", "Starts with a hook question", "Uses bullet points for lists"],
+  commonPhrases: ["Here's what I learned", "The truth is", "I used to think...", "Let me explain"],
   favoriteEmojis: ["💡", "🔥", "🚀", "✅"],
 };
 
@@ -49,12 +55,12 @@ const PLANS = [
 ];
 
 export default function SettingsPage() {
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<Tab>("profile");
   const [profile, setProfile] = useState<UserProfile>({ firstName: "", lastName: "", email: "", linkedinUrl: "" });
   const [voice, setVoice] = useState<VoiceData | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [retaining, setRetaining] = useState(false);
   const [projectsUsed] = useState(3);
   const [projectsLimit] = useState(5);
 
@@ -64,6 +70,14 @@ export default function SettingsPage() {
         const supabase = getSupabaseBrowser();
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) return;
+
+        // Try loading brand voice from localStorage first (set during onboarding)
+        const savedVoice = localStorage.getItem("link2post_brand_voice");
+        if (savedVoice) {
+          try {
+            setVoice(JSON.parse(savedVoice));
+          } catch { /* ignore */ }
+        }
 
         const res = await fetch("/api/settings/profile", {
           headers: { Authorization: `Bearer ${session.access_token}` },
@@ -77,6 +91,7 @@ export default function SettingsPage() {
             email: session.user.email || "",
             linkedinUrl: data.linkedinUrl || "",
           });
+          // DB voice profile takes precedence over localStorage
           if (data.voiceProfile) {
             setVoice(data.voiceProfile);
           }
@@ -84,12 +99,12 @@ export default function SettingsPage() {
           setProfile((prev) => ({ ...prev, email: session.user.email || "" }));
         }
       } catch {
-        setVoice(MOCK_VOICE);
+        if (!voice) setVoice(MOCK_VOICE);
       }
     }
 
     loadProfile();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (saved) {
@@ -126,23 +141,8 @@ export default function SettingsPage() {
     }
   };
 
-  const handleRetrain = async () => {
-    setRetaining(true);
-    try {
-      const supabase = getSupabaseBrowser();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        await fetch("/api/voice/retrain", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-      }
-      setVoice(MOCK_VOICE);
-    } catch {
-      /* silent */
-    } finally {
-      setRetaining(false);
-    }
+  const handleRetrain = () => {
+    router.push("/onboarding");
   };
 
   return (
@@ -248,15 +248,16 @@ export default function SettingsPage() {
         )}
 
         {activeTab === "voice" && (
-          <div className="flex flex-col gap-5 max-w-md">
+          <div className="flex flex-col gap-5">
             <h3 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
-              Voice Profile
+              Brand Voice Profile
             </h3>
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              Extracted writing style metrics from your LinkedIn content.
+              Your AI-analyzed writing style. Every piece of content is generated to match this voice.
             </p>
 
-            <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-5">
+              {/* Tone */}
               <div>
                 <span className="text-xs font-medium block mb-2" style={{ color: "var(--text-muted)" }}>
                   Tone
@@ -274,18 +275,104 @@ export default function SettingsPage() {
                 </div>
               </div>
 
+              {/* Personality */}
+              {voice?.personality && (
+                <div>
+                  <span className="text-xs font-medium block mb-2" style={{ color: "var(--text-muted)" }}>
+                    Personality
+                  </span>
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                    {voice.personality}
+                  </p>
+                </div>
+              )}
+
+              {/* Vocabulary */}
               <div>
                 <span className="text-xs font-medium block mb-2" style={{ color: "var(--text-muted)" }}>
-                  Avg Sentence Length
+                  Vocabulary
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(voice?.vocabulary || []).map((v) => (
+                    <span
+                      key={v}
+                      className="px-2.5 py-1 rounded-full text-xs font-medium"
+                      style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
+                    >
+                      {v}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sentence Length */}
+              <div>
+                <span className="text-xs font-medium block mb-2" style={{ color: "var(--text-muted)" }}>
+                  Sentence Length
                 </span>
                 <span
                   className="px-2.5 py-1 rounded-full text-xs font-medium capitalize"
                   style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
                 >
-                  {voice?.avgSentenceLength || "—"}
+                  {voice?.sentenceLength || "—"}
                 </span>
               </div>
 
+              {/* CTA Style */}
+              {voice?.ctaStyle && (
+                <div>
+                  <span className="text-xs font-medium block mb-2" style={{ color: "var(--text-muted)" }}>
+                    CTA Style
+                  </span>
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                    {voice.ctaStyle}
+                  </p>
+                </div>
+              )}
+
+              {/* Storytelling Style */}
+              {voice?.storytellingStyle && (
+                <div>
+                  <span className="text-xs font-medium block mb-2" style={{ color: "var(--text-muted)" }}>
+                    Storytelling Style
+                  </span>
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                    {voice.storytellingStyle}
+                  </p>
+                </div>
+              )}
+
+              {/* Content Pillars */}
+              <div>
+                <span className="text-xs font-medium block mb-2" style={{ color: "var(--text-muted)" }}>
+                  Content Pillars
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {(voice?.contentPillars || []).map((p) => (
+                    <span
+                      key={p}
+                      className="px-2.5 py-1 rounded-full text-xs font-medium"
+                      style={{ background: "rgba(16,185,129,0.12)", color: "var(--success)" }}
+                    >
+                      {p}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              {/* Target Audience */}
+              {voice?.targetAudience && (
+                <div>
+                  <span className="text-xs font-medium block mb-2" style={{ color: "var(--text-muted)" }}>
+                    Target Audience
+                  </span>
+                  <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                    {voice.targetAudience}
+                  </p>
+                </div>
+              )}
+
+              {/* Formatting Style */}
               <div>
                 <span className="text-xs font-medium block mb-2" style={{ color: "var(--text-muted)" }}>
                   Formatting Style
@@ -303,23 +390,7 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div>
-                <span className="text-xs font-medium block mb-2" style={{ color: "var(--text-muted)" }}>
-                  Vocabulary Traits
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  {(voice?.vocabularyTraits || []).map((v) => (
-                    <span
-                      key={v}
-                      className="px-2.5 py-1 rounded-full text-xs font-medium"
-                      style={{ background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}
-                    >
-                      {v}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
+              {/* Common Phrases */}
               <div>
                 <span className="text-xs font-medium block mb-2" style={{ color: "var(--text-muted)" }}>
                   Common Phrases
@@ -337,27 +408,37 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              <div>
-                <span className="text-xs font-medium block mb-2" style={{ color: "var(--text-muted)" }}>
-                  Favorite Emojis
-                </span>
-                <div className="flex gap-2">
-                  {(voice?.favoriteEmojis || []).map((e) => (
-                    <span key={e} className="text-xl">
-                      {e}
-                    </span>
-                  ))}
+              {/* Favorite Emojis */}
+              {(voice?.favoriteEmojis?.length ?? 0) > 0 && (
+                <div>
+                  <span className="text-xs font-medium block mb-2" style={{ color: "var(--text-muted)" }}>
+                    Favorite Emojis
+                  </span>
+                  <div className="flex gap-2">
+                    {(voice?.favoriteEmojis || []).map((e) => (
+                      <span key={e} className="text-xl">
+                        {e}
+                      </span>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
 
-            <button
-              onClick={handleRetrain}
-              disabled={retaining}
-              className="btn-secondary self-start text-sm"
-            >
-              {retaining ? "Re-analyzing..." : "Re-train Voice"}
-            </button>
+            <div className="flex gap-3 mt-2">
+              <button
+                onClick={() => router.push("/onboarding")}
+                className="btn-secondary text-sm"
+              >
+                Re-do Onboarding
+              </button>
+              <button
+                onClick={handleRetrain}
+                className="btn-secondary text-sm"
+              >
+                Re-train Voice
+              </button>
+            </div>
           </div>
         )}
 
@@ -460,10 +541,11 @@ export default function SettingsPage() {
 
             <div className="flex flex-col gap-2">
               {[
-                { name: "OpenAI", configured: true },
-                { name: "Anthropic", configured: true },
-                { name: "Google Gemini", configured: false },
-                { name: "Groq", configured: false },
+                { name: "Google Gemini", envVar: "GEMINI_API_KEY" },
+                { name: "Groq", envVar: "GROQ_API_KEY" },
+                { name: "OpenRouter", envVar: "OPENROUTER_API_KEY" },
+                { name: "Cerebras", envVar: "CEREBRAS_API_KEY" },
+                { name: "Mistral", envVar: "MISTRAL_API_KEY" },
               ].map((provider) => (
                 <div
                   key={provider.name}
@@ -476,11 +558,11 @@ export default function SettingsPage() {
                   <span
                     className="text-[11px] font-medium px-2 py-0.5 rounded-full"
                     style={{
-                      background: provider.configured ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.1)",
-                      color: provider.configured ? "var(--success)" : "var(--error)",
+                      background: "rgba(129,140,248,0.12)",
+                      color: "var(--accent)",
                     }}
                   >
-                    {provider.configured ? "Configured" : "Not configured"}
+                    Server-managed
                   </span>
                 </div>
               ))}

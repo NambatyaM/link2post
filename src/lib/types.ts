@@ -6,6 +6,7 @@ export interface LinkedInPost {
   authorityScore?: number;
   commentPotential?: number;
   readabilityScore?: number;
+  status?: "draft" | "approved" | "archived";
 }
 
 export interface LinkedInArticle {
@@ -57,11 +58,61 @@ export interface VoiceProfile {
   favoriteEmojis: string[];
 }
 
+/**
+ * Comprehensive Brand Voice Profile — stored in DB, used for every generation.
+ */
+export interface BrandVoiceProfile {
+  id: string;
+  userId: string;
+  name: string;
+
+  // Core voice attributes
+  tone: string[];                    // e.g. ["conversational", "provocative", "warm"]
+  personality: string;               // 2-3 sentence summary
+  vocabulary: string[];              // e.g. ["jargon-free", "direct", "uses metaphors"]
+  sentenceLength: "short" | "medium" | "long" | "varied";
+  ctaStyle: string;                  // e.g. "Questions that invite debate, never generic"
+  storytellingStyle: string;         // e.g. "First-person narrative with personal anecdotes"
+
+  // Content strategy
+  contentPillars: string[];          // e.g. ["leadership lessons", "startup failures", "AI trends"]
+  targetAudience: string;            // e.g. "Founders and CTOs at 10-100 person SaaS companies"
+
+  // Formatting patterns
+  formattingStyle: string[];         // e.g. ["1-2 sentences per paragraph", "line breaks between thoughts"]
+  commonPhrases: string[];           // e.g. ["Here's what I learned", "The truth is"]
+  favoriteEmojis: string[];          // e.g. ["💡", "🔥"]
+
+  // Source metadata
+  contentSources: string[];          // e.g. ["linkedin_posts", "youtube_transcript", "blog"]
+  postCountAnalyzed: number;
+
+  // Raw prompt text — prepended to every generation
+  voicePrompt: string;
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Input types for the onboarding content submission.
+ */
+export type ContentInputType = "youtube_transcript" | "podcast_transcript" | "blog" | "linkedin_posts" | "website" | "other";
+
+export interface ContentSubmission {
+  type: ContentInputType;
+  text: string;
+  label?: string;  // e.g. "My LinkedIn posts", "Podcast episode transcript"
+}
+
 export interface Project {
   id: string;
   userId: string;
   title: string;
   rawTranscript: string;
+  niche?: string;
+  audience?: string;
+  goals?: string;
   status: ProjectStatus;
   createdAt: string;
 }

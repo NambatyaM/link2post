@@ -36,11 +36,12 @@ export async function POST(req: NextRequest) {
     const user = await verifyToken(token);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const { title, transcript, niche, audience } = await req.json() as {
+    const { title, transcript, niche, audience, goals } = await req.json() as {
       title?: string;
       transcript?: string;
       niche?: string;
       audience?: string;
+      goals?: string;
     };
 
     if (!title || !transcript) {
@@ -57,6 +58,7 @@ export async function POST(req: NextRequest) {
         raw_transcript: transcript,
         niche: niche || null,
         audience: audience || null,
+        goals: goals || null,
         status: "processing",
       })
       .select("id")
@@ -67,7 +69,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "Failed to create project" }, { status: 500 });
     }
 
-    return Response.json({ project_id: data.id, status: "processing" }, { status: 201 });
+    return Response.json({ project: { id: data.id }, status: "processing" }, { status: 201 });
   } catch (error) {
     console.error("Project create error:", error);
     return Response.json({ error: "Something went wrong" }, { status: 500 });

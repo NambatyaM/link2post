@@ -19,9 +19,10 @@ export async function POST(
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const { id: projectId } = await params;
-    const { niche: _niche, audience } = await req.json() as {
+    const { niche: _niche, audience, voiceProfilePrompt } = await req.json() as {
       niche?: string;
       audience?: string;
+      voiceProfilePrompt?: string;
     };
 
     const supabase = getSupabaseServer();
@@ -63,7 +64,7 @@ export async function POST(
       async start(controller) {
         for (const route of routes) {
           try {
-            const userPrompt = buildYouTubePrompt(videoInfo, "UTC", audience);
+            const userPrompt = buildYouTubePrompt(videoInfo, "UTC", audience, voiceProfilePrompt);
             const baseUrl = getProviderBaseUrl(route.provider);
             const apiKey = getProviderApiKey(route.provider);
             if (!apiKey) continue;

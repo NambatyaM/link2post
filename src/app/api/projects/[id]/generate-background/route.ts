@@ -13,13 +13,14 @@ export async function POST(
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const { id: projectId } = await params;
-    const { niche, audience } = await req.json() as {
+    const { niche, audience, voiceProfilePrompt } = await req.json() as {
       niche?: string;
       audience?: string;
+      voiceProfilePrompt?: string;
     };
 
     const run = await generateContentTask.trigger(
-      { projectId, userId: user.userId, niche, audience },
+      { projectId, userId: user.userId, niche, audience, voiceProfilePrompt },
       { tags: [`user:${user.userId}`, `project:${projectId}`] },
     );
 

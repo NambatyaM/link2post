@@ -57,7 +57,30 @@ export default function NewProjectPage() {
       const supabase = getSupabaseBrowser();
       const { data: { session } } = await supabase.auth.getSession();
 
-      const inputText = inputMode === "transcript" ? transcript.trim() : url.trim();
+      let inputText = inputMode === "transcript" ? transcript.trim() : "";
+
+      if (inputMode === "url") {
+        const transcriptRes = await fetch("/api/youtube/transcript", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify({ url: url.trim() }),
+        });
+
+        if (!transcriptRes.ok) {
+          const errData = await transcriptRes.json().catch(() => ({}));
+          throw new Error(errData.error || "Failed to extract transcript from YouTube");
+        }
+
+        const transcriptData = await transcriptRes.json();
+        inputText = transcriptData.transcript;
+
+        if (!title.trim()) {
+          setTitle(transcriptData.title || "YouTube Video");
+        }
+      }
 
       const res = await fetch("/api/projects", {
         method: "POST",
@@ -71,7 +94,7 @@ export default function NewProjectPage() {
           inputMode,
           niche,
           audience: audience.trim(),
-          goals,
+          goals: goals.join(", "),
         }),
       });
 
@@ -214,7 +237,7 @@ export default function NewProjectPage() {
             {generating ? (
               <span className="flex items-center justify-center gap-2">
                 <span className="h-4 w-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: "white" }} />
-                Creating Project...
+                {inputMode === "url" ? "Extracting transcript..." : "Creating Project..."}
               </span>
             ) : (
               "Generate Content"
