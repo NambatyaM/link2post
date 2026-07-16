@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { PROVIDERS, getProviderApiKey, fetchWithTimeout, recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
+import { getProviderBaseUrl, getProviderApiKey, getProviderHeaders } from "@/services/ai/providers/shared";
 
 const HEALTH_TIMEOUT_MS = 10_000;
 const HEALTH_PROMPT = "Say exactly one word: ok";
@@ -12,69 +12,75 @@ interface ModelHealth {
   error?: string;
 }
 
+const MODELS_TO_TEST = [
+  { provider: "gemini", model: "gemini-2.0-flash" },
+  { provider: "groq", model: "llama-3.3-70b-versatile" },
+  { provider: "groq", model: "mixtral-8x7b-32768" },
+  { provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct" },
+  { provider: "openrouter", model: "meta-llama/llama-3.1-70b-instruct" },
+  { provider: "cerebras", model: "llama-3.3-70b" },
+  { provider: "mistral", model: "mistral-small-latest" },
+];
+
 export async function GET(_req: NextRequest) {
   const results: ModelHealth[] = [];
 
-  for (const provider of PROVIDERS) {
+  for (const { provider, model } of MODELS_TO_TEST) {
     const apiKey = getProviderApiKey(provider);
     if (!apiKey) {
-      for (const model of provider.models) {
-        results.push({ provider: provider.id, model: model.id, status: "skip", error: "no API key" });
-      }
+      results.push({ provider, model, status: "skip", error: "no API key" });
       continue;
     }
 
-    for (const model of provider.models) {
-      const start = Date.now();
-      try {
-        const response = await fetchWithTimeout(
-          provider.baseUrl,
-          {
-            method: "POST",
-            headers: {
-              Authorization: `Bearer ${apiKey}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              model: model.id,
-              messages: [{ role: "user", content: HEALTH_PROMPT }],
-              max_tokens: 10,
-              stream: false,
-            }),
-          },
-          HEALTH_TIMEOUT_MS,
-        );
+    const baseUrl = getProviderBaseUrl(provider);
+    if (!baseUrl) {
+      results.push({ provider, model, status: "skip", error: "no base URL" });
+      continue;
+    }
 
-        const latencyMs = Date.now() - start;
+    const start = Date.now();
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), HEALTH_TIMEOUT_MS);
 
-        if (!response.ok) {
-          const status = response.status;
-          const isRateLimit = status === 429;
-          const error = isRateLimit ? `rate limited (${status})` : `HTTP ${status}`;
-          recordProviderFailure(provider.id);
-          results.push({ provider: provider.id, model: model.id, status: "fail", latencyMs, error });
-          console.error(`[health] ${provider.id}/${model.id} FAILED: ${error} (${latencyMs}ms)`);
-          continue;
-        }
+      const response = await fetch(baseUrl, {
+        method: "POST",
+        headers: getProviderHeaders(provider, apiKey),
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: HEALTH_PROMPT }],
+          max_tokens: 10,
+          stream: false,
+        }),
+        signal: controller.signal,
+      });
 
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content;
-        if (typeof content !== "string" || content.trim().length === 0) {
-          recordProviderFailure(provider.id);
-          results.push({ provider: provider.id, model: model.id, status: "fail", latencyMs, error: "empty response" });
-          console.error(`[health] ${provider.id}/${model.id} FAILED: empty response (${latencyMs}ms)`);
-          continue;
-        }
+      clearTimeout(timer);
+      const latencyMs = Date.now() - start;
 
-        clearProviderCooldown(provider.id);
-        results.push({ provider: provider.id, model: model.id, status: "ok", latencyMs });
-      } catch (err: unknown) {
-        const latencyMs = Date.now() - start;
-        const error = err instanceof Error ? err.message : "unknown error";
-        recordProviderFailure(provider.id);
-        results.push({ provider: provider.id, model: model.id, status: "fail", latencyMs, error });
-        console.error(`[health] ${provider.id}/${model.id} FAILED: ${error} (${latencyMs}ms)`);
+      if (!response.ok) {
+        const status = response.status;
+        const error = status === 429 ? `rate limited (${status})` : `HTTP ${status}`;
+        results.push({ provider, model, status: "fail", latencyMs, error });
+        console.error(`[health] ${provider}/${model} FAILED: ${error} (${latencyMs}ms)`);
+        continue;
       }
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content;
+      if (typeof content !== "string" || content.trim().length === 0) {
+        results.push({ provider, model, status: "fail", latencyMs, error: "empty response" });
+        console.error(`[health] ${provider}/${model} FAILED: empty response (${latencyMs}ms)`);
+        continue;
+      }
+
+      results.push({ provider, model, status: "ok", latencyMs });
+      console.log(`[health] ${provider}/${model} OK (${latencyMs}ms)`);
+    } catch (err: unknown) {
+      const latencyMs = Date.now() - start;
+      const error = err instanceof Error ? err.message : "unknown error";
+      results.push({ provider, model, status: "fail", latencyMs, error });
+      console.error(`[health] ${provider}/${model} FAILED: ${error} (${latencyMs}ms)`);
     }
   }
 
@@ -87,9 +93,6 @@ export async function GET(_req: NextRequest) {
   };
 
   const hasFailures = summary.fail > 0;
-  if (hasFailures) {
-    console.warn(`[health] ${summary.fail}/${summary.total} models failing`, results.filter((r) => r.status === "fail"));
-  }
 
   return Response.json({ summary, results }, { status: hasFailures ? 207 : 200 });
 }

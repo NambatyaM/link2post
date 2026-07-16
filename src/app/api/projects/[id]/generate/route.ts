@@ -5,6 +5,7 @@ import { SYSTEM_PROMPT, buildYouTubePrompt } from "@/lib/prompts";
 import { recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
 import { createThinkingFilter } from "@/lib/thinking-filter";
 import { getRouteForTask } from "@/services/ai";
+import { getProviderBaseUrl, getProviderApiKey, getProviderHeaders, parseSSEChunk } from "@/services/ai/providers/shared";
 import type { VideoInfo } from "@/lib/types";
 
 export async function POST(
@@ -69,13 +70,7 @@ export async function POST(
 
             const response = await fetch(baseUrl, {
               method: "POST",
-              headers: {
-                Authorization: `Bearer ${apiKey}`,
-                "Content-Type": "application/json",
-                ...(route.provider === "openrouter"
-                  ? { "HTTP-Referer": "https://link2post.app", "X-Title": "Link2Post" }
-                  : {}),
-              },
+              headers: getProviderHeaders(route.provider, apiKey),
               body: JSON.stringify({
                 model: route.model,
                 messages: [
@@ -107,36 +102,28 @@ export async function POST(
               const lines = chunk.split("\n");
 
               for (const line of lines) {
-                const trimmed = line.trim();
-                if (!trimmed || !trimmed.startsWith("data: ")) continue;
-
-                const data = trimmed.slice(6);
-                if (data === "[DONE]") {
+                const result = parseSSEChunk(line);
+                if (result.done) {
                   controller.enqueue(encoder.encode("data: [DONE]\n\n"));
                   controller.close();
                   await saveGeneratedContent(supabase, projectId, user.userId, accumulatedContent, "completed");
                   return;
                 }
-
-                try {
-                  const parsed = JSON.parse(data);
-                  const content = parsed.choices?.[0]?.delta?.content;
-                  if (typeof content === "string" && content.length > 0) {
-                    const filtered = filterThinking(content);
-                    if (filtered.length > 0) {
-                      accumulatedContent += filtered;
-                      if (firstChunk) {
-                        controller.enqueue(
-                          encoder.encode(`data: ${JSON.stringify({ model: route.model, provider: route.provider })}\n\n`),
-                        );
-                        firstChunk = false;
-                      }
+                if (result.content) {
+                  const filtered = filterThinking(result.content);
+                  if (filtered.length > 0) {
+                    accumulatedContent += filtered;
+                    if (firstChunk) {
                       controller.enqueue(
-                        encoder.encode(`data: ${JSON.stringify({ content: filtered })}\n\n`),
+                        encoder.encode(`data: ${JSON.stringify({ model: route.model, provider: route.provider })}\n\n`),
                       );
+                      firstChunk = false;
                     }
+                    controller.enqueue(
+                      encoder.encode(`data: ${JSON.stringify({ content: filtered })}\n\n`),
+                    );
                   }
-                } catch { /* skip malformed */ }
+                }
               }
             }
 
@@ -221,26 +208,4 @@ async function saveGeneratedContent(
   } catch (e) {
     console.error("saveGeneratedContent error:", e);
   }
-}
-
-function getProviderBaseUrl(provider: string): string {
-  const urls: Record<string, string> = {
-    gemini: `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || "gemini-2.0-flash"}:streamGenerateContent?alt=sse&key=${process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_STUDIO_API_KEY}`,
-    groq: "https://api.groq.com/openai/v1/chat/completions",
-    openrouter: "https://openrouter.ai/api/v1/chat/completions",
-    cerebras: "https://api.cerebras.ai/v1/chat/completions",
-    mistral: "https://api.mistral.ai/v1/chat/completions",
-  };
-  return urls[provider] || "";
-}
-
-function getProviderApiKey(provider: string): string | undefined {
-  const keys: Record<string, string | undefined> = {
-    gemini: process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_STUDIO_API_KEY,
-    groq: process.env.GROQ_API_KEY,
-    openrouter: process.env.OPENROUTER_API_KEY,
-    cerebras: process.env.CEREBRAS_API_KEY,
-    mistral: process.env.MISTRAL_API_KEY,
-  };
-  return keys[provider];
 }
