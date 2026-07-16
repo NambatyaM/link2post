@@ -4,13 +4,12 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
-type Tab = "profile" | "voice" | "billing" | "api";
+type Tab = "profile" | "voice" | "billing";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "profile", label: "Profile" },
   { id: "voice", label: "Voice Profile" },
   { id: "billing", label: "Billing" },
-  { id: "api", label: "API Keys" },
 ];
 
 interface UserProfile {
@@ -530,46 +529,6 @@ export default function SettingsPage() {
           </div>
         )}
 
-        {activeTab === "api" && (
-          <div className="flex flex-col gap-5 max-w-md">
-            <h3 className="text-base font-semibold" style={{ color: "var(--text-primary)" }}>
-              API Keys
-            </h3>
-            <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-              API keys are configured server-side. Contact your admin to update
-              provider credentials.
-            </p>
-
-            <div className="flex flex-col gap-2">
-              {[
-                { name: "Google Gemini", envVar: "GEMINI_API_KEY" },
-                { name: "Groq", envVar: "GROQ_API_KEY" },
-                { name: "OpenRouter", envVar: "OPENROUTER_API_KEY" },
-                { name: "Cerebras", envVar: "CEREBRAS_API_KEY" },
-                { name: "Mistral", envVar: "MISTRAL_API_KEY" },
-              ].map((provider) => (
-                <div
-                  key={provider.name}
-                  className="flex items-center justify-between p-3 rounded-lg"
-                  style={{ background: "var(--bg-tertiary)", border: "1px solid var(--border)" }}
-                >
-                  <span className="text-sm font-medium" style={{ color: "var(--text-primary)" }}>
-                    {provider.name}
-                  </span>
-                  <span
-                    className="text-[11px] font-medium px-2 py-0.5 rounded-full"
-                    style={{
-                      background: "rgba(129,140,248,0.12)",
-                      color: "var(--accent)",
-                    }}
-                  >
-                    Server-managed
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
     </main>
   );

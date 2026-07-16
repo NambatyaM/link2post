@@ -17,7 +17,7 @@ export async function GET(
 
     const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id, title, raw_transcript, status, niche, audience, created_at")
+      .select("id, user_id, title, raw_transcript, status, niche, audience, goals, created_at")
       .eq("id", id)
       .eq("user_id", user.userId)
       .single();
@@ -28,7 +28,7 @@ export async function GET(
 
     const { data: posts, error: postsError } = await supabase
       .from("posts")
-      .select("id, content, hook, post_type, virality_score, authority_score, comment_potential, readability_score, image_prompt, status, scheduled_date, created_at")
+      .select("id, project_id, user_id, content, hook, post_type, virality_score, authority_score, comment_potential, readability_score, image_prompt, status, scheduled_date, created_at")
       .eq("project_id", id)
       .eq("user_id", user.userId)
       .order("created_at", { ascending: true });
@@ -38,7 +38,37 @@ export async function GET(
       return Response.json({ error: "Failed to fetch posts" }, { status: 500 });
     }
 
-    return Response.json({ project, posts: posts || [] });
+    const mappedProject = {
+      id: project.id,
+      userId: project.user_id,
+      title: project.title,
+      rawTranscript: project.raw_transcript,
+      niche: project.niche,
+      audience: project.audience,
+      goals: project.goals,
+      status: project.status,
+      createdAt: project.created_at,
+    };
+
+    const mappedPosts = (posts || []).map((p) => ({
+      id: p.id,
+      projectId: p.project_id,
+      userId: p.user_id,
+      content: p.content,
+      hook: p.hook,
+      body: p.content?.split("\n\n").slice(1).join("\n\n") || "",
+      postType: p.post_type,
+      viralityScore: p.virality_score,
+      authorityScore: p.authority_score,
+      commentPotential: p.comment_potential,
+      readabilityScore: p.readability_score,
+      imagePrompt: p.image_prompt,
+      status: p.status,
+      scheduledDate: p.scheduled_date,
+      createdAt: p.created_at,
+    }));
+
+    return Response.json({ project: mappedProject, posts: mappedPosts });
   } catch (error) {
     console.error("Project get error:", error);
     return Response.json({ error: "Something went wrong" }, { status: 500 });

@@ -11,18 +11,47 @@ export async function GET(req: NextRequest) {
 
     const supabase = getSupabaseServer();
 
-    const { data, error } = await supabase
+    const { data: projects, error: projectsError } = await supabase
       .from("projects")
-      .select("id, title, status, niche, audience, created_at")
+      .select("id, user_id, title, raw_transcript, status, niche, audience, goals, created_at")
       .eq("user_id", user.userId)
       .order("created_at", { ascending: false });
 
-    if (error) {
-      console.error("Projects list error:", error);
+    if (projectsError) {
+      console.error("Projects list error:", projectsError);
       return Response.json({ error: "Failed to fetch projects" }, { status: 500 });
     }
 
-    return Response.json({ projects: data });
+    const projectIds = (projects || []).map((p) => p.id);
+
+    let postCounts: Record<string, number> = {};
+    if (projectIds.length > 0) {
+      const { data: counts } = await supabase
+        .from("posts")
+        .select("project_id")
+        .in("project_id", projectIds);
+
+      if (counts) {
+        for (const row of counts) {
+          postCounts[row.project_id] = (postCounts[row.project_id] || 0) + 1;
+        }
+      }
+    }
+
+    const mapped = (projects || []).map((p) => ({
+      id: p.id,
+      userId: p.user_id,
+      title: p.title,
+      rawTranscript: p.raw_transcript,
+      niche: p.niche,
+      audience: p.audience,
+      goals: p.goals,
+      status: p.status,
+      createdAt: p.created_at,
+      postCount: postCounts[p.id] || 0,
+    }));
+
+    return Response.json({ projects: mapped });
   } catch (error) {
     console.error("Projects list error:", error);
     return Response.json({ error: "Something went wrong" }, { status: 500 });
