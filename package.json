@@ -12,6 +12,7 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.2",
     "@tiptap/extension-character-count": "^3.28.0",
     "@tiptap/extension-highlight": "^3.28.0",
