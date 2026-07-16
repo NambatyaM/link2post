@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import type { LinkedInPost } from "@/lib/types";
 import ImagePromptCard from "./ImagePromptCard";
-import RichTextEditor from "./RichTextEditor";
+
+const RichTextEditor = lazy(() => import("./RichTextEditor"));
 
 interface PostEditorProps {
   post: LinkedInPost;
@@ -197,11 +198,13 @@ export default function PostEditor({ post, index, onUpdate, onSave, onApprove, o
             </div>
           </div>
 
-          <RichTextEditor
-            content={body}
-            onChange={handleBodyChange}
-            placeholder="Write your post body here..."
-          />
+          <Suspense fallback={<div className="rounded-xl h-48 animate-pulse" style={{ background: "var(--bg-tertiary)" }} />}>
+            <RichTextEditor
+              content={body}
+              onChange={handleBodyChange}
+              placeholder="Write your post body here..."
+            />
+          </Suspense>
 
           <div className="flex items-center justify-between px-1">
             <div className="flex items-center gap-2">

@@ -134,10 +134,25 @@ export function downloadFile(content: string, filename: string, mimeType: string
   URL.revokeObjectURL(url);
 }
 
-export { exportToPdf, downloadPdf } from "@/lib/export-pdf";
-export { exportToDocx, downloadDocx } from "@/lib/export-docx";
-export { exportToExcel, downloadExcel } from "@/lib/export-excel";
-export { exportToZip, downloadZip } from "@/lib/export-zip";
+export async function downloadPdf(result: LinkedInResult, filename?: string) {
+  const mod = await import("@/lib/export-pdf");
+  mod.downloadPdf(result, filename);
+}
+
+export async function downloadDocx(result: LinkedInResult, filename?: string) {
+  const mod = await import("@/lib/export-docx");
+  await mod.downloadDocx(result, filename);
+}
+
+export async function downloadExcel(result: LinkedInResult, filename?: string) {
+  const mod = await import("@/lib/export-excel");
+  await mod.downloadExcel(result, filename);
+}
+
+export async function downloadZip(result: LinkedInResult, filename?: string) {
+  const mod = await import("@/lib/export-zip");
+  await mod.downloadZip(result, filename);
+}
 
 export function downloadAllFormats(
   result: LinkedInResult,

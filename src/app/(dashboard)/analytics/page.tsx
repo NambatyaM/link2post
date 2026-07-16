@@ -1,10 +1,33 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import {
-  PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend,
-} from "recharts";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
+
+const PieChartLazy = lazy(() =>
+  import("recharts").then((m) => ({
+    default: ({ data, ...props }: any) => (
+      <m.ResponsiveContainer width="100%" height={220}>
+        <m.PieChart {...props}>
+          <m.Pie data={data} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value" stroke="none">
+            {data.map((entry: any) => <m.Cell key={entry.name} fill={entry.color} />)}
+          </m.Pie>
+          <m.Tooltip content={({ active, payload }: any) => {
+            if (!active || !payload?.length) return null;
+            const d = payload[0].payload as { name: string; value: number; color: string };
+            const total = data.reduce((s: number, i: any) => s + i.value, 0);
+            const pct = Math.round((d.value / total) * 100);
+            return (
+              <div className="rounded-lg px-3 py-2 text-xs shadow-lg" style={{ background: "#171717", border: "1px solid #262626" }}>
+                <p style={{ color: d.color }} className="font-medium">{d.name}: {pct}%</p>
+              </div>
+            );
+          }} />
+          <m.Legend verticalAlign="bottom" height={36} formatter={(v: string) => <span style={{ color: "var(--text-secondary)", fontSize: 11 }}>{v}</span>} />
+        </m.PieChart>
+      </m.ResponsiveContainer>
+    ),
+  }))
+);
 
 const PIE_COLORS: Record<string, string> = {
   story: "#60A5FA",
@@ -226,24 +249,9 @@ export default function AnalyticsPage() {
                 <div className="rounded-xl p-5" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
                   <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--text-primary)" }}>Content Mix</h3>
                   {contentMix.length > 0 ? (
-                    <ResponsiveContainer width="100%" height={220}>
-                      <PieChart>
-                        <Pie data={contentMix} cx="50%" cy="50%" innerRadius={50} outerRadius={80} paddingAngle={3} dataKey="value" stroke="none">
-                          {contentMix.map((entry) => <Cell key={entry.name} fill={entry.color} />)}
-                        </Pie>
-                        <Tooltip content={({ active, payload }) => {
-                          if (!active || !payload?.length) return null;
-                          const d = payload[0].payload as { name: string; value: number; color: string };
-                          const pct = Math.round((d.value / totalPosts) * 100);
-                          return (
-                            <div className="rounded-lg px-3 py-2 text-xs shadow-lg" style={{ background: "#171717", border: "1px solid #262626" }}>
-                              <p style={{ color: d.color }} className="font-medium">{d.name}: {pct}%</p>
-                            </div>
-                          );
-                        }} />
-                        <Legend verticalAlign="bottom" height={36} formatter={(v: string) => <span style={{ color: "var(--text-secondary)", fontSize: 11 }}>{v}</span>} />
-                      </PieChart>
-                    </ResponsiveContainer>
+                    <Suspense fallback={<div className="h-[220px] rounded-lg animate-pulse" style={{ background: "var(--bg-tertiary)" }} />}>
+                      <PieChartLazy data={contentMix} />
+                    </Suspense>
                   ) : (
                     <p className="text-xs py-8 text-center" style={{ color: "var(--text-muted)" }}>No data yet</p>
                   )}
