@@ -47,7 +47,6 @@ const CAROUSEL_FEATURES = [
 ];
 
 const ROADMAP = [
-  { label: "LinkedIn direct publishing", status: "next" },
   { label: "AI comment assistant", status: "next" },
   { label: "Team workspaces", status: "planned" },
   { label: "Personal brand analytics", status: "planned" },
@@ -652,7 +651,7 @@ export default function LandingPage() {
           <RevealBlock>
             <h2 className="text-2xl sm:text-3xl font-bold mb-4">Your Next Month of LinkedIn Content Is Already in Your Transcript</h2>
             <p className="text-sm mb-8 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              Stop staring at a blank page. Paste one transcript and leave with a complete LinkedIn content system — posts, carousel PDFs, articles, a publishing calendar, and an AI growth plan tailored to your voice.
+              Stop staring at a blank page. Paste one transcript and leave with a complete LinkedIn content system — posts, carousel PDFs, articles, a content calendar, and an AI growth plan tailored to your voice.
             </p>
             <Link
               href="/signup"
