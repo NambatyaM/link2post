@@ -302,7 +302,7 @@ export default function LandingPage() {
       {/* Nav */}
       <nav
         className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 md:px-12"
-        style={{ height: 64, background: "rgba(10,10,10,0.85)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--border)" }}
+        style={{ height: 64, background: "var(--nav-bg)", backdropFilter: "blur(12px)", borderBottom: "1px solid var(--border)" }}
       >
         <Link href="/" className="flex items-center gap-2.5">
           <img src="/logo.png" alt="Link2Post" className="h-7 w-auto" />
