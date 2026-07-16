@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 
 export default function ThemeToggle() {
-  const [isLight, setIsLight] = useState(false);
+  const [isLight, setIsLight] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {

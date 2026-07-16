@@ -26,8 +26,8 @@ const THEME_INIT = `
   (function() {
     try {
       var t = localStorage.getItem('link2post_theme');
-      if (t === 'light') document.documentElement.classList.add('light');
-      else document.documentElement.classList.remove('light');
+      if (t === 'dark') document.documentElement.classList.remove('light');
+      else document.documentElement.classList.add('light');
     } catch(e) {}
   })();
 `;
@@ -38,7 +38,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark" suppressHydrationWarning>
+    <html lang="en" className="light" suppressHydrationWarning>
       <body className={inter.className}>
         <Script id="theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
         {children}
