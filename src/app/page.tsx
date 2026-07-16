@@ -19,9 +19,9 @@ const STEPS = [
 ];
 
 const PRICING = [
-  { name: "Free", price: "$0", period: "forever", features: ["1 project", "3 posts per month", "Basic transcript mining", "Content calendar"], cta: "Start Free", highlighted: false },
-  { name: "Pro", price: "$29", period: "/month", features: ["10 projects", "20 posts per month", "Full voice cloning", "Visual strategy prompts", "Analytics dashboard", "Priority support"], cta: "Start Pro Trial", highlighted: true },
-  { name: "Business", price: "$99", period: "/month", features: ["Unlimited projects", "Unlimited posts", "Multi-voice profiles", "Team collaboration", "Advanced analytics", "API access", "Dedicated support"], cta: "Contact Sales", highlighted: false },
+  { name: "Free", price: "$0", period: "forever", features: ["1 project", "3 posts per month", "Basic transcript mining", "Content calendar"], cta: "Start Free", highlighted: false, link: "/signup" },
+  { name: "Pro", price: "$29", period: "/month", features: ["10 projects", "20 posts per month", "Full voice cloning", "Visual strategy prompts", "Analytics dashboard", "Priority support"], cta: "Coming Soon", highlighted: true, link: "/beta" },
+  { name: "Business", price: "$99", period: "/month", features: ["Unlimited projects", "Unlimited posts", "Multi-voice profiles", "Team collaboration", "Advanced analytics", "API access", "Dedicated support"], cta: "Coming Soon", highlighted: false, link: "/beta" },
 ];
 
 function useScrollReveal() {
@@ -280,7 +280,7 @@ export default function LandingPage() {
                     ))}
                   </ul>
                   <Link
-                    href="/signup"
+                    href={plan.link}
                     className="block text-center text-xs font-semibold py-2.5 rounded-xl transition-all"
                     style={{
                       background: plan.highlighted ? "var(--accent)" : "transparent",

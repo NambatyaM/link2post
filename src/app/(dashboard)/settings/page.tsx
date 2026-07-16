@@ -50,8 +50,8 @@ const MOCK_VOICE: VoiceData = {
 
 const PLANS = [
   { name: "Free", price: "$0", features: ["5 projects/month", "Basic templates", "Standard AI"], current: true },
-  { name: "Pro", price: "$19/mo", features: ["Unlimited projects", "Voice profiling", "Priority AI", "Calendar scheduling"], current: false },
-  { name: "Business", price: "$49/mo", features: ["Team seats", "Custom branding", "API access", "Dedicated support"], current: false },
+  { name: "Pro", price: "$29/mo", features: ["Unlimited projects", "Voice profiling", "Priority AI", "Calendar scheduling"], current: false },
+  { name: "Business", price: "$99/mo", features: ["Team seats", "Custom branding", "API access", "Dedicated support"], current: false },
 ];
 
 export default function SettingsPage() {
@@ -517,10 +517,11 @@ export default function SettingsPage() {
                     </span>
                   ) : (
                     <button
+                      onClick={() => router.push("/beta")}
                       className="text-xs text-center py-1.5 rounded-md font-medium transition-colors"
                       style={{ background: "var(--accent)", color: "white" }}
                     >
-                      Upgrade
+                      Coming Soon
                     </button>
                   )}
                 </div>
