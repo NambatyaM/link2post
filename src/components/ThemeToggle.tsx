@@ -1,28 +1,37 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function ThemeToggle() {
-  const [isLight, setIsLight] = useState(() => {
-    if (typeof document !== "undefined") {
-      return document.documentElement.classList.contains("light");
-    }
-    return false;
-  });
+  const [isLight, setIsLight] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    const hasLight = document.documentElement.classList.contains("light");
+    setIsLight(hasLight);
+    setMounted(true);
+  }, []);
 
   const toggle = () => {
     const newIsLight = document.documentElement.classList.toggle("light");
     setIsLight(newIsLight);
-    localStorage.setItem("link2post_theme", newIsLight ? "light" : "dark");
+    try {
+      localStorage.setItem("link2post_theme", newIsLight ? "light" : "dark");
+    } catch {}
   };
+
+  if (!mounted) return null;
 
   return (
     <button
       onClick={toggle}
-      className="p-2 rounded-lg transition-colors"
+      className="flex items-center justify-center rounded-lg transition-colors"
       style={{
-        color: "var(--text-muted)",
-        background: "transparent",
+        width: 34,
+        height: 34,
+        color: "var(--text-secondary)",
+        background: "var(--bg-tertiary)",
+        border: "1px solid var(--border)",
       }}
       title={isLight ? "Switch to dark mode" : "Switch to light mode"}
     >

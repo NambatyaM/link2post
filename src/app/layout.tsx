@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const inter = Inter({
@@ -21,15 +22,12 @@ export const metadata: Metadata = {
   },
 };
 
-const themeScript = `
+const THEME_INIT = `
   (function() {
     try {
-      var theme = localStorage.getItem('link2post_theme');
-      if (theme === 'light') {
-        document.documentElement.classList.add('light');
-      } else if (theme === 'dark') {
-        document.documentElement.classList.remove('light');
-      }
+      var t = localStorage.getItem('link2post_theme');
+      if (t === 'light') document.documentElement.classList.add('light');
+      else document.documentElement.classList.remove('light');
     } catch(e) {}
   })();
 `;
@@ -41,10 +39,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
-      </head>
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        <Script id="theme-init" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: THEME_INIT }} />
+        {children}
+      </body>
     </html>
   );
 }
