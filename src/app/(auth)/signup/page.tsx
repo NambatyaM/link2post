@@ -37,12 +37,29 @@ export default function SignupPage() {
     }
   };
 
+  const backLink = (
+    <Link
+      href="/"
+      className="fixed top-5 left-5 flex items-center gap-2 text-sm transition-colors"
+      style={{ color: "var(--text-muted)" }}
+      onMouseEnter={(e) => { e.currentTarget.style.color = "var(--text-primary)"; }}
+      onMouseLeave={(e) => { e.currentTarget.style.color = "var(--text-muted)"; }}
+    >
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <line x1="19" y1="12" x2="5" y2="12" />
+        <polyline points="12 19 5 12 12 5" />
+      </svg>
+      Home
+    </Link>
+  );
+
   if (confirmationSent) {
     return (
       <div
         className="flex min-h-dvh items-center justify-center px-6"
         style={{ background: "var(--bg-primary)" }}
       >
+        {backLink}
         <div className="w-full max-w-sm text-center">
           <div
             className="w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-4"
@@ -85,6 +102,7 @@ export default function SignupPage() {
       className="flex min-h-dvh items-center justify-center px-6"
       style={{ background: "var(--bg-primary)" }}
     >
+      {backLink}
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
           <img

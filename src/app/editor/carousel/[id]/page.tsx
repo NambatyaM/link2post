@@ -162,11 +162,43 @@ function EditorPageContent({ projectId }: { projectId: string }) {
   }
 
   return (
-    <CarouselEditor
-      initialSlides={slides}
-      projectTitle={title}
-      onExport={() => {}}
-    />
+    <div className="flex flex-col h-screen" style={{ background: "var(--bg-primary)" }}>
+      <div
+        className="flex items-center gap-3 px-4 border-b shrink-0"
+        style={{ height: 44, background: "var(--bg-secondary)", borderColor: "var(--border)" }}
+      >
+        <button
+          onClick={() => router.back()}
+          className="flex items-center justify-center rounded-lg transition-colors shrink-0"
+          style={{
+            width: 32,
+            height: 32,
+            color: "var(--text-muted)",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "var(--bg-tertiary)";
+            e.currentTarget.style.color = "var(--text-primary)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.color = "var(--text-muted)";
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+        </button>
+        <span className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{title}</span>
+      </div>
+      <div className="flex-1 min-h-0">
+        <CarouselEditor
+          initialSlides={slides}
+          projectTitle={title}
+          onExport={() => {}}
+        />
+      </div>
+    </div>
   );
 }
 

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import ThemeToggle from "@/components/ThemeToggle";
 
 interface Breadcrumb {
@@ -14,6 +15,8 @@ interface HeaderProps {
 }
 
 export default function Header({ breadcrumbs, onSearch }: HeaderProps) {
+  const router = useRouter();
+
   return (
     <header
       className="flex items-center justify-between shrink-0 border-b"
@@ -25,6 +28,29 @@ export default function Header({ breadcrumbs, onSearch }: HeaderProps) {
       }}
     >
       <nav className="flex items-center gap-1.5 min-w-0">
+        <button
+          onClick={() => router.back()}
+          className="flex items-center justify-center rounded-lg transition-colors shrink-0"
+          style={{
+            width: 32,
+            height: 32,
+            color: "var(--text-muted)",
+            background: "transparent",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "var(--bg-tertiary)";
+            e.currentTarget.style.color = "var(--text-primary)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.color = "var(--text-muted)";
+          }}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="19" y1="12" x2="5" y2="12" />
+            <polyline points="12 19 5 12 12 5" />
+          </svg>
+        </button>
         {breadcrumbs.map((crumb, i) => {
           const isLast = i === breadcrumbs.length - 1;
           return (
