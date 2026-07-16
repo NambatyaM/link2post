@@ -386,7 +386,7 @@ export default function LandingPage() {
       </section>
 
       {/* Why Link2Post */}
-      <section className="px-6 py-24" style={{ background: "var(--bg-secondary)" }}>
+      <section id="features" className="px-6 py-24" style={{ background: "var(--bg-secondary)" }}>
         <div className="max-w-4xl mx-auto">
           <RevealBlock>
             <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">Why Link2Post?</h2>
