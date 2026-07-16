@@ -3,37 +3,65 @@ import { SYSTEM_PROMPT, PROMPTS, buildYouTubePrompt } from "@/lib/prompts";
 import { checkRateLimit, getRateLimitHeaders, recordGeneration } from "@/lib/rate-limit";
 import { verifyToken, extractBearerToken } from "@/lib/auth";
 import { validateLinkedInResult, type ValidationError } from "@/lib/validate";
-import { buildAttempts, fetchWithTimeout, recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
+import { recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
 import { generateFullLinkedInResponse } from "@/lib/local-generator";
 import { createThinkingFilter } from "@/lib/thinking-filter";
 import { recordGenerationEvent } from "@/lib/analytics";
+import { getRouteForTask, routeTask } from "@/services/ai";
 import type { VideoInfo, LinkedInResult, ContentType } from "@/lib/types";
+import type { TaskType } from "@/services/ai/types";
 
 async function streamCompletion(
   systemPrompt: string,
   userPrompt: string,
   videoInfo: VideoInfo,
+  taskType: TaskType = "post_generation",
   providerId?: string,
   modelId?: string,
 ): Promise<ReadableStream<Uint8Array>> {
   const encoder = new TextEncoder();
-  const attempts = buildAttempts(providerId, modelId);
 
-  if (attempts.length === 0) {
+  // Use AI Router for provider selection with failover
+  const routes = getRouteForTask(taskType);
+
+  if (routes.length === 0) {
     const local = generateFullLinkedInResponse(videoInfo);
     return mockStream(encoder, JSON.stringify(local));
   }
 
-  for (const attempt of attempts) {
+  // If specific provider requested, try it first then fall back to router
+  const orderedRoutes = [...routes];
+  if (providerId && modelId) {
+    const idx = orderedRoutes.findIndex(
+      (r) => r.provider === providerId && r.model === modelId,
+    );
+    if (idx > 0) {
+      const [moved] = orderedRoutes.splice(idx, 1);
+      orderedRoutes.unshift(moved);
+    }
+  }
+
+  for (const route of orderedRoutes) {
     try {
-      const response = await fetchWithTimeout(attempt.provider.baseUrl, {
+      // Build the request body using the provider's expected format
+      const baseUrl = getProviderBaseUrl(route.provider);
+      const apiKey = getProviderApiKey(route.provider);
+      if (!apiKey) continue;
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      const response = await fetch(baseUrl, {
+        signal: controller.signal,
         method: "POST",
         headers: {
-          Authorization: `Bearer ${attempt.apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
+          ...(route.provider === "openrouter"
+            ? { "HTTP-Referer": "https://link2post.app", "X-Title": "Link2Post" }
+            : {}),
         },
         body: JSON.stringify({
-          model: attempt.model,
+          model: route.model,
           messages: [
             { role: "system", content: systemPrompt },
             { role: "user", content: userPrompt },
@@ -43,14 +71,15 @@ async function streamCompletion(
           stream: true,
         }),
       });
+      clearTimeout(timeoutId);
 
       if (!response.ok || !response.body) {
-        console.error(`Stream: Model ${attempt.model} (${attempt.provider.label}) failed: status=${response.status}`);
-        recordProviderFailure(attempt.provider.id);
+        console.error(`[ai-router] Stream: ${route.provider}/${route.model} failed: status=${response.status}`);
+        recordProviderFailure(route.provider);
         continue;
       }
 
-      clearProviderCooldown(attempt.provider.id);
+      clearProviderCooldown(route.provider);
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -86,7 +115,7 @@ async function streamCompletion(
                     if (filtered.length > 0) {
                       if (firstChunk) {
                         controller.enqueue(
-                          encoder.encode(`data: ${JSON.stringify({ model: attempt.model, provider: attempt.provider.label })}\n\n`),
+                          encoder.encode(`data: ${JSON.stringify({ model: route.model, provider: route.provider })}\n\n`),
                         );
                         firstChunk = false;
                       }
@@ -102,7 +131,7 @@ async function streamCompletion(
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
           } catch (e) {
-            console.error(`Stream error for model ${attempt.model}:`, e);
+            console.error(`[ai-router] Stream error for ${route.provider}/${route.model}:`, e);
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
           }
@@ -117,6 +146,28 @@ async function streamCompletion(
 
   const local = generateFullLinkedInResponse(videoInfo);
   return mockStream(encoder, JSON.stringify(local));
+}
+
+function getProviderBaseUrl(provider: string): string {
+  const urls: Record<string, string> = {
+    gemini: `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || "gemini-2.0-flash"}:streamGenerateContent?alt=sse&key=${process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_STUDIO_API_KEY}`,
+    groq: "https://api.groq.com/openai/v1/chat/completions",
+    openrouter: "https://openrouter.ai/api/v1/chat/completions",
+    cerebras: "https://api.cerebras.ai/v1/chat/completions",
+    mistral: "https://api.mistral.ai/v1/chat/completions",
+  };
+  return urls[provider] || "";
+}
+
+function getProviderApiKey(provider: string): string | undefined {
+  const keys: Record<string, string | undefined> = {
+    gemini: process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_STUDIO_API_KEY,
+    groq: process.env.GROQ_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+    cerebras: process.env.CEREBRAS_API_KEY,
+    mistral: process.env.MISTRAL_API_KEY,
+  };
+  return keys[provider];
 }
 
 function mockStream(
@@ -218,70 +269,40 @@ export async function POST(req: NextRequest) {
 
     await recordGeneration({ userId, deviceId }).catch(() => {});
 
+    const genStart = Date.now();
+
     // --- Plain text dispatch for carousel and script ---
     if (contentType === "carousel" || contentType === "script") {
       const prompt = PROMPTS[contentType].replace("{transcript}", videoInfo.transcript);
-      const attempts = buildAttempts(providerId, modelId);
+      const taskType: TaskType = contentType === "carousel" ? "carousel_generation" : "post_generation";
 
-      if (attempts.length === 0) {
+      try {
+        const result = await routeTask(taskType, prompt, SYSTEM_PROMPT);
+        const durationMs = Date.now() - genStart;
+        recordGenerationEvent({
+          userId, deviceId, generationType: contentType,
+          providerId: result.provider, modelId: result.model, success: true, durationMs,
+        }).catch(() => {});
+
+        return Response.json({ output: result.content }, { headers: getRateLimitHeaders(rateResult) });
+      } catch {
+        const durationMs = Date.now() - genStart;
+        recordGenerationEvent({
+          userId, deviceId, generationType: contentType,
+          providerId: "none", modelId: "none", success: false, durationMs,
+        }).catch(() => {});
+
         return Response.json(
-          { error: "No AI providers available. Please try again." },
-          { status: 503 },
+          { error: "Generation failed. Please try again." },
+          { status: 500 },
         );
       }
-
-      const genStart = Date.now();
-      for (const attempt of attempts) {
-        try {
-          const response = await fetchWithTimeout(attempt.provider.baseUrl, {
-            method: "POST",
-            headers: { Authorization: `Bearer ${attempt.apiKey}`, "Content-Type": "application/json" },
-            body: JSON.stringify({
-              model: attempt.model,
-              messages: [{ role: "user", content: prompt }],
-              temperature: 0.7,
-              max_tokens: 4000,
-              stream: false,
-            }),
-          });
-
-          if (!response.ok) {
-            recordProviderFailure(attempt.provider.id);
-            continue;
-          }
-          clearProviderCooldown(attempt.provider.id);
-
-          const data = await response.json();
-          const content = data.choices?.[0]?.message?.content;
-          if (typeof content !== "string" || content.trim().length === 0) continue;
-
-          const durationMs = Date.now() - genStart;
-          recordGenerationEvent({
-            userId, deviceId, generationType: contentType,
-            providerId: attempt.provider.id, modelId: attempt.model, success: true, durationMs,
-          }).catch(() => {});
-
-          return Response.json({ output: content }, { headers: getRateLimitHeaders(rateResult) });
-        } catch { continue; }
-      }
-
-      const durationMs = Date.now() - genStart;
-      recordGenerationEvent({
-        userId, deviceId, generationType: contentType,
-        providerId: "none", modelId: "none", success: false, durationMs,
-      }).catch(() => {});
-
-      return Response.json(
-        { error: "Generation failed. Please try again." },
-        { status: 500 },
-      );
     }
 
     // --- Existing JSON flow for post / article (or no contentType) ---
-    const genStart = Date.now();
 
     if (wantStream === false) {
-      const { result, validation } = await generateAndValidate(videoInfo, timezone, audience, providerId, modelId);
+      const { result, validation } = await generateAndValidate(videoInfo, timezone, audience);
       const durationMs = Date.now() - genStart;
       recordGenerationEvent({
         userId, deviceId, generationType: "calendar",
@@ -295,7 +316,7 @@ export async function POST(req: NextRequest) {
     }
 
     const userPrompt = buildYouTubePrompt(videoInfo, timezone, audience);
-    const stream = await streamCompletion(SYSTEM_PROMPT, userPrompt, videoInfo, providerId, modelId);
+    const stream = await streamCompletion(SYSTEM_PROMPT, userPrompt, videoInfo, "content_calendar", providerId, modelId);
     const durationMs = Date.now() - genStart;
     recordGenerationEvent({
       userId, deviceId, generationType: "calendar",
@@ -323,102 +344,25 @@ export async function generateAndValidate(
   videoInfo: VideoInfo,
   timezone: string,
   audience?: string,
-  providerId?: string,
-  modelId?: string,
 ): Promise<{ result: LinkedInResult; validation: ReturnType<typeof validateLinkedInResult> }> {
-  const attempts = buildAttempts(providerId, modelId);
   const userPrompt = buildYouTubePrompt(videoInfo, timezone, audience);
 
-  if (attempts.length === 0) {
-    console.error("generateAndValidate: No providers available, using local generator");
+  try {
+    const routeResult = await routeTask("content_calendar", userPrompt, SYSTEM_PROMPT);
+    console.log(`generateAndValidate: Success via ${routeResult.provider}/${routeResult.model} in ${routeResult.latencyMs}ms`);
+
+    const result = parseAIResponse(routeResult.content);
+    if (!result) {
+      console.error("generateAndValidate: Failed to parse AI response");
+      const localResult = generateFullLinkedInResponse(videoInfo);
+      return { result: localResult, validation: validateLinkedInResult(localResult) };
+    }
+
+    const validation = validateLinkedInResult(result);
+    return { result, validation };
+  } catch (e) {
+    console.error("generateAndValidate: AI Router failed, falling back to local generator:", e);
     const localResult = generateFullLinkedInResponse(videoInfo);
     return { result: localResult, validation: validateLinkedInResult(localResult) };
   }
-
-  console.log(`generateAndValidate: ${attempts.length} models to try, starting with ${attempts[0].model} (${attempts[0].provider.label})`);
-
-  for (const attempt of attempts) {
-    try {
-      const response = await fetchWithTimeout(attempt.provider.baseUrl, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${attempt.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: attempt.model,
-          messages: [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: userPrompt },
-          ],
-          temperature: 0.7,
-          max_tokens: 4000,
-          stream: false,
-        }),
-      });
-
-      if (!response.ok) {
-        console.error(`Model ${attempt.model} (${attempt.provider.label}) returned status ${response.status}`);
-        recordProviderFailure(attempt.provider.id);
-        continue;
-      }
-
-      clearProviderCooldown(attempt.provider.id);
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content;
-      if (typeof content !== "string") {
-        console.error(`Model ${attempt.model} returned no content string`);
-        continue;
-      }
-
-      const result = parseAIResponse(content);
-      if (!result) {
-        console.error(`Model ${attempt.model} response failed JSON parsing, preview:`, content.substring(0, 300));
-        continue;
-      }
-
-      const validation = validateLinkedInResult(result);
-
-      if (!validation.valid) {
-        const retryPrompt = buildValidationFeedbackPrompt(userPrompt, validation.errors);
-        const retryResponse = await fetchWithTimeout(attempt.provider.baseUrl, {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${attempt.apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            model: attempt.model,
-            messages: [
-              { role: "system", content: SYSTEM_PROMPT },
-              { role: "user", content: retryPrompt },
-            ],
-            temperature: 0.7,
-          max_tokens: 4000,
-            stream: false,
-          }),
-        });
-
-        if (retryResponse.ok) {
-          const retryData = await retryResponse.json();
-          const retryContent = retryData.choices?.[0]?.message?.content;
-          if (typeof retryContent === "string") {
-            const retryResult = parseAIResponse(retryContent);
-            if (retryResult) {
-              return { result: retryResult, validation: validateLinkedInResult(retryResult) };
-            }
-          }
-        }
-      }
-
-      return { result, validation };
-    } catch (e) {
-      console.error(`Error with model ${attempt.model}:`, e);
-      continue;
-    }
-  }
-
-  const fallback = generateFullLinkedInResponse(videoInfo);
-  return { result: fallback, validation: validateLinkedInResult(fallback) };
 }

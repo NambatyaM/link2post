@@ -459,10 +459,12 @@ Transcript:
 // HELPER FUNCTIONS
 // ============================================================================
 
+// NOTE: taskType is used by @/services/ai for task-based model routing.
 export function getGeneratePrompt(
   contentType: ContentType,
   transcript: string,
   voiceMemoryContext?: string,
+  taskType?: string,
 ): string {
   const base = PROMPTS[contentType].replace("{transcript}", transcript);
   if (!voiceMemoryContext) return base;

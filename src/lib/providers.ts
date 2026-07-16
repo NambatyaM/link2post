@@ -1,3 +1,6 @@
+// NOTE: For new code, use @/services/ai which provides task-based routing.
+// This file is kept for backwards compatibility with existing API routes.
+
 export interface ProviderModel {
   id: string;
   label: string;

@@ -1,4 +1,4 @@
-import { task, metadata } from "@trigger.dev/sdk";
+import { task, metadata } from "@trigger.dev/sdk/v3";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { buildYouTubePrompt, SYSTEM_PROMPT } from "@/lib/prompts";
 import { buildAttempts, fetchWithTimeout, recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
@@ -177,7 +177,7 @@ export const generateContentTask = task({
       validationWarnings: validation.warnings,
     };
   },
-  onFailure: async ({ payload }) => {
+  onFailure: async (payload: GenerateContentPayload, error: unknown, { ctx: _ctx }) => {
     const { projectId, userId } = payload;
     try {
       const supabase = getSupabaseServer();

@@ -2,8 +2,9 @@ import { NextRequest } from "next/server";
 import { extractBearerToken, verifyToken } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { SYSTEM_PROMPT, buildYouTubePrompt } from "@/lib/prompts";
-import { buildAttempts, fetchWithTimeout, recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
+import { recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
 import { createThinkingFilter } from "@/lib/thinking-filter";
+import { getRouteForTask } from "@/services/ai";
 import type { VideoInfo } from "@/lib/types";
 
 export async function POST(
@@ -47,9 +48,9 @@ export async function POST(
       videoId: "",
     };
 
-    const attempts = buildAttempts();
+    const routes = getRouteForTask("content_calendar");
 
-    if (attempts.length === 0) {
+    if (routes.length === 0) {
       return Response.json({ error: "No AI providers available" }, { status: 503 });
     }
 
@@ -59,18 +60,24 @@ export async function POST(
 
     const stream = new ReadableStream({
       async start(controller) {
-        for (const attempt of attempts) {
+        for (const route of routes) {
           try {
             const userPrompt = buildYouTubePrompt(videoInfo, "UTC", audience);
+            const baseUrl = getProviderBaseUrl(route.provider);
+            const apiKey = getProviderApiKey(route.provider);
+            if (!apiKey) continue;
 
-            const response = await fetchWithTimeout(attempt.provider.baseUrl, {
+            const response = await fetch(baseUrl, {
               method: "POST",
               headers: {
-                Authorization: `Bearer ${attempt.apiKey}`,
+                Authorization: `Bearer ${apiKey}`,
                 "Content-Type": "application/json",
+                ...(route.provider === "openrouter"
+                  ? { "HTTP-Referer": "https://link2post.app", "X-Title": "Link2Post" }
+                  : {}),
               },
               body: JSON.stringify({
-                model: attempt.model,
+                model: route.model,
                 messages: [
                   { role: "system", content: SYSTEM_PROMPT },
                   { role: "user", content: userPrompt },
@@ -82,11 +89,11 @@ export async function POST(
             });
 
             if (!response.ok || !response.body) {
-              recordProviderFailure(attempt.provider.id);
+              recordProviderFailure(route.provider);
               continue;
             }
 
-            clearProviderCooldown(attempt.provider.id);
+            clearProviderCooldown(route.provider);
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
@@ -120,7 +127,7 @@ export async function POST(
                       accumulatedContent += filtered;
                       if (firstChunk) {
                         controller.enqueue(
-                          encoder.encode(`data: ${JSON.stringify({ model: attempt.model, provider: attempt.provider.label })}\n\n`),
+                          encoder.encode(`data: ${JSON.stringify({ model: route.model, provider: route.provider })}\n\n`),
                         );
                         firstChunk = false;
                       }
@@ -214,4 +221,26 @@ async function saveGeneratedContent(
   } catch (e) {
     console.error("saveGeneratedContent error:", e);
   }
+}
+
+function getProviderBaseUrl(provider: string): string {
+  const urls: Record<string, string> = {
+    gemini: `https://generativelanguage.googleapis.com/v1beta/models/${process.env.GEMINI_MODEL || "gemini-2.0-flash"}:streamGenerateContent?alt=sse&key=${process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_STUDIO_API_KEY}`,
+    groq: "https://api.groq.com/openai/v1/chat/completions",
+    openrouter: "https://openrouter.ai/api/v1/chat/completions",
+    cerebras: "https://api.cerebras.ai/v1/chat/completions",
+    mistral: "https://api.mistral.ai/v1/chat/completions",
+  };
+  return urls[provider] || "";
+}
+
+function getProviderApiKey(provider: string): string | undefined {
+  const keys: Record<string, string | undefined> = {
+    gemini: process.env.GEMINI_API_KEY || process.env.GOOGLE_AI_STUDIO_API_KEY,
+    groq: process.env.GROQ_API_KEY,
+    openrouter: process.env.OPENROUTER_API_KEY,
+    cerebras: process.env.CEREBRAS_API_KEY,
+    mistral: process.env.MISTRAL_API_KEY,
+  };
+  return keys[provider];
 }
