@@ -22,6 +22,28 @@
   --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.4), 0 2px 4px -1px rgba(0,0,0,0.3);
 }
 
+.light {
+  --bg-primary: #FFFFFF;
+  --bg-secondary: #F9FAFB;
+  --bg-tertiary: #F3F4F6;
+  --bg-input: #FFFFFF;
+  --bg-hover: #F3F4F6;
+  --bg-user-msg: #EEF2FF;
+  --accent: #6366F1;
+  --accent-hover: #818CF8;
+  --text-primary: #111827;
+  --text-secondary: #4B5563;
+  --text-muted: #9CA3AF;
+  --border: #E5E7EB;
+  --border-light: #F3F4F6;
+  --scrollbar-thumb: #D1D5DB;
+  --success: #059669;
+  --error: #DC2626;
+  --surface: #FFFFFF;
+  --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+}
+
 * {
   box-sizing: border-box;
 }

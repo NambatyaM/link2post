@@ -10,7 +10,6 @@ import SearchModal from "@/components/shared/SearchModal";
 const ROUTE_LABELS: Record<string, string> = {
   dashboard: "Dashboard",
   projects: "Projects",
-  library: "Library",
   calendar: "Calendar",
   analytics: "Analytics",
   settings: "Settings",

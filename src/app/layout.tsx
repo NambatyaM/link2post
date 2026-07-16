@@ -21,13 +21,29 @@ export const metadata: Metadata = {
   },
 };
 
+const themeScript = `
+  (function() {
+    try {
+      var theme = localStorage.getItem('link2post_theme');
+      if (theme === 'light') {
+        document.documentElement.classList.add('light');
+      } else if (theme === 'dark') {
+        document.documentElement.classList.remove('light');
+      }
+    } catch(e) {}
+  })();
+`;
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" className="dark" suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className={inter.className}>{children}</body>
     </html>
   );

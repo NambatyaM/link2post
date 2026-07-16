@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import ThemeToggle from "@/components/ThemeToggle";
 
 interface Breadcrumb {
   label: string;
@@ -74,7 +75,8 @@ export default function Header({ breadcrumbs, onSearch }: HeaderProps) {
         })}
       </nav>
 
-      <div className="flex items-center gap-3 shrink-0">
+      <div className="flex items-center gap-2 shrink-0">
+        <ThemeToggle />
         <button
           onClick={onSearch}
           className="flex items-center gap-2 rounded-lg transition-colors"

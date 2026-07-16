@@ -13,7 +13,6 @@ interface SidebarProps {
 const NAV_ITEMS = [
   { label: "Dashboard", href: "/dashboard", icon: HomeIcon },
   { label: "Projects", href: "/projects", icon: FolderIcon },
-  { label: "Library", href: "/library", icon: BookIcon },
   { label: "Calendar", href: "/calendar", icon: CalendarIcon },
   { label: "Analytics", href: "/analytics", icon: BarChartIcon },
   { label: "Settings", href: "/settings", icon: GearIcon },
