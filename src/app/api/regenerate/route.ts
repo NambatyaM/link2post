@@ -33,7 +33,7 @@ async function streamCompletion(
             { role: "user", content: prompt },
           ],
           temperature: 0.7,
-          max_tokens: 4000,
+          max_tokens: 16000,
           stream: true,
         }),
       });
@@ -121,7 +121,7 @@ async function generateComplete(
             { role: "user", content: prompt },
           ],
           temperature: 0.7,
-          max_tokens: 4000,
+          max_tokens: 16000,
           stream: false,
         }),
       });

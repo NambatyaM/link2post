@@ -267,7 +267,21 @@ function ProjectContent({ projectId }: { projectId: string }) {
             {saveMessage}
           </span>
         )}
-        <ExportToolbar project={project} posts={posts} />
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => router.push(`/editor/carousel/${projectId}`)}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+            style={{ background: "var(--bg-secondary)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2"/>
+              <line x1="8" y1="21" x2="16" y2="21"/>
+              <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            Carousel
+          </button>
+          <ExportToolbar project={project} posts={posts} />
+        </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
@@ -371,7 +385,7 @@ function ProjectContent({ projectId }: { projectId: string }) {
             <div className="flex flex-col items-center justify-center h-full gap-4">
               <div className="h-10 w-10 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
               <p className="text-sm" style={{ color: "var(--accent)" }}>{generateProgress}</p>
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>This may take 15-30 seconds...</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>Generating your content...</p>
             </div>
           ) : selectedIndex !== null && posts[selectedIndex] ? (
             <PostEditor

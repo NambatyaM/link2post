@@ -8,6 +8,9 @@ import { getRouteForTask } from "@/services/ai";
 import { getProviderBaseUrl, getProviderApiKey, getProviderHeaders, parseSSEChunk } from "@/services/ai/providers/shared";
 import type { VideoInfo } from "@/lib/types";
 
+const PROVIDER_TIMEOUT_MS = 90_000;
+const STREAM_STALL_MS = 30_000;
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -69,20 +72,33 @@ export async function POST(
             const apiKey = getProviderApiKey(route.provider);
             if (!apiKey) continue;
 
-            const response = await fetch(baseUrl, {
-              method: "POST",
-              headers: getProviderHeaders(route.provider, apiKey),
-              body: JSON.stringify({
-                model: route.model,
-                messages: [
-                  { role: "system", content: SYSTEM_PROMPT },
-                  { role: "user", content: userPrompt },
-                ],
-                temperature: 0.7,
-                max_tokens: 4000,
-                stream: true,
-              }),
-            });
+            const controller2 = new AbortController();
+            const timeout = setTimeout(() => controller2.abort(), PROVIDER_TIMEOUT_MS);
+
+            let response: Response;
+            try {
+              response = await fetch(baseUrl, {
+                method: "POST",
+                headers: getProviderHeaders(route.provider, apiKey),
+                body: JSON.stringify({
+                  model: route.model,
+                  messages: [
+                    { role: "system", content: SYSTEM_PROMPT },
+                    { role: "user", content: userPrompt },
+                  ],
+                  temperature: 0.7,
+                  max_tokens: 16000,
+                  stream: true,
+                }),
+                signal: controller2.signal,
+              });
+            } catch {
+              clearTimeout(timeout);
+              recordProviderFailure(route.provider);
+              continue;
+            }
+
+            clearTimeout(timeout);
 
             if (!response.ok || !response.body) {
               recordProviderFailure(route.provider);
@@ -94,38 +110,50 @@ export async function POST(
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
             const filterThinking = createThinkingFilter();
+            let lastChunkTime = Date.now();
 
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
+            const stallCheck = setInterval(() => {
+              if (Date.now() - lastChunkTime > STREAM_STALL_MS) {
+                reader.cancel("stream stalled").catch(() => {});
+              }
+            }, 5_000);
 
-              const chunk = decoder.decode(value, { stream: true });
-              const lines = chunk.split("\n");
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
 
-              for (const line of lines) {
-                const result = parseSSEChunk(line);
-                if (result.done) {
-                  controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-                  controller.close();
-                  await saveGeneratedContent(supabase, projectId, user.userId, accumulatedContent, "completed");
-                  return;
-                }
-                if (result.content) {
-                  const filtered = filterThinking(result.content);
-                  if (filtered.length > 0) {
-                    accumulatedContent += filtered;
-                    if (firstChunk) {
+                lastChunkTime = Date.now();
+                const chunk = decoder.decode(value, { stream: true });
+                const lines = chunk.split("\n");
+
+                for (const line of lines) {
+                  const result = parseSSEChunk(line);
+                  if (result.done) {
+                    controller.enqueue(encoder.encode("data: [DONE]\n\n"));
+                    controller.close();
+                    await saveGeneratedContent(supabase, projectId, user.userId, accumulatedContent, "completed");
+                    return;
+                  }
+                  if (result.content) {
+                    const filtered = filterThinking(result.content);
+                    if (filtered.length > 0) {
+                      accumulatedContent += filtered;
+                      if (firstChunk) {
+                        controller.enqueue(
+                          encoder.encode(`data: ${JSON.stringify({ model: route.model, provider: route.provider })}\n\n`),
+                        );
+                        firstChunk = false;
+                      }
                       controller.enqueue(
-                        encoder.encode(`data: ${JSON.stringify({ model: route.model, provider: route.provider })}\n\n`),
+                        encoder.encode(`data: ${JSON.stringify({ content: filtered })}\n\n`),
                       );
-                      firstChunk = false;
                     }
-                    controller.enqueue(
-                      encoder.encode(`data: ${JSON.stringify({ content: filtered })}\n\n`),
-                    );
                   }
                 }
               }
+            } finally {
+              clearInterval(stallCheck);
             }
 
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
