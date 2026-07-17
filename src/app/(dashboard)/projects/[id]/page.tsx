@@ -42,6 +42,10 @@ function ProjectContent({ projectId }: { projectId: string }) {
   const [generating, setGenerating] = useState(false);
   const [generateProgress, setGenerateProgress] = useState("");
   const postsReceivedRef = useRef(false);
+  const [editingProject, setEditingProject] = useState(false);
+  const [editTitle, setEditTitle] = useState("");
+  const [editAudience, setEditAudience] = useState("");
+  const [editNiche, setEditNiche] = useState("");
 
   const handleUpdatePost = useCallback((index: number, updated: LinkedInPost) => {
     setPosts((prev) => {
@@ -123,6 +127,30 @@ function ProjectContent({ projectId }: { projectId: string }) {
       return prev;
     });
   }, [selectedIndex, posts.length]);
+
+  const handleSaveProject = useCallback(async () => {
+    if (!project) return;
+    try {
+      const supabase = getSupabaseBrowser();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ title: editTitle, audience: editAudience, niche: editNiche }),
+      });
+
+      if (!res.ok) throw new Error("Failed to save");
+      setEditingProject(false);
+      setSaveMessage("Project updated");
+      setTimeout(() => setSaveMessage(""), 2000);
+      window.location.reload();
+    } catch {
+      setSaveMessage("Failed to save project");
+      setTimeout(() => setSaveMessage(""), 2000);
+    }
+  }, [project, projectId, editTitle, editAudience, editNiche]);
 
   const handleGenerate = useCallback(async () => {
     if (!project || generating) return;
@@ -270,6 +298,22 @@ function ProjectContent({ projectId }: { projectId: string }) {
         )}
         <div className="flex items-center gap-2">
           <button
+            onClick={() => {
+              setEditTitle(project.title);
+              setEditAudience(project.audience || "");
+              setEditNiche(project.niche || "");
+              setEditingProject(true);
+            }}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+            style={{ background: "var(--bg-secondary)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Edit
+          </button>
+          <button
             onClick={() => router.push(`/editor/carousel/${projectId}`)}
             className="flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
             style={{ background: "var(--bg-secondary)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
@@ -415,6 +459,61 @@ function ProjectContent({ projectId }: { projectId: string }) {
           )}
         </div>
       </div>
+
+      {editingProject && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)" }}>
+          <div className="w-full max-w-md rounded-xl p-6" style={{ background: "var(--bg-primary)", border: "1px solid var(--border)" }}>
+            <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--text-primary)" }}>Edit Project</h3>
+            <div className="flex flex-col gap-3">
+              <div>
+                <label className="text-[11px] font-medium mb-1 block" style={{ color: "var(--text-muted)" }}>Title</label>
+                <input
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full text-sm px-3 py-2 rounded-lg outline-none"
+                  style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-medium mb-1 block" style={{ color: "var(--text-muted)" }}>Audience</label>
+                <input
+                  value={editAudience}
+                  onChange={(e) => setEditAudience(e.target.value)}
+                  className="w-full text-sm px-3 py-2 rounded-lg outline-none"
+                  style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+                  placeholder="e.g. Software engineers, startup founders"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-medium mb-1 block" style={{ color: "var(--text-muted)" }}>Niche</label>
+                <input
+                  value={editNiche}
+                  onChange={(e) => setEditNiche(e.target.value)}
+                  className="w-full text-sm px-3 py-2 rounded-lg outline-none"
+                  style={{ background: "var(--bg-secondary)", color: "var(--text-primary)", border: "1px solid var(--border)" }}
+                  placeholder="e.g. AI, SaaS, productivity"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-5">
+              <button
+                onClick={() => setEditingProject(false)}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                style={{ background: "var(--bg-secondary)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveProject}
+                className="text-xs font-medium px-4 py-1.5 rounded-lg transition-colors"
+                style={{ background: "var(--accent)", color: "white" }}
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

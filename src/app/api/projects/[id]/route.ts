@@ -86,11 +86,13 @@ export async function PATCH(
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const { id: projectId } = await params;
-    const { posts } = await req.json() as {
+    const body = await req.json() as {
+      title?: string;
+      audience?: string;
+      niche?: string;
+      goals?: string;
       posts?: Array<{ hook: string; body: string; imagePrompt: string; viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number; status?: string }>;
     };
-
-    if (!posts) return Response.json({ error: "posts is required" }, { status: 400 });
 
     const supabase = getSupabaseServer();
 
@@ -103,28 +105,40 @@ export async function PATCH(
 
     if (!project) return Response.json({ error: "Not found" }, { status: 404 });
 
-    await supabase
-      .from("posts")
-      .delete()
-      .eq("project_id", projectId)
-      .eq("user_id", user.userId);
+    const projectUpdates: Record<string, string> = {};
+    if (body.title !== undefined) projectUpdates.title = body.title;
+    if (body.audience !== undefined) projectUpdates.audience = body.audience;
+    if (body.niche !== undefined) projectUpdates.niche = body.niche;
+    if (body.goals !== undefined) projectUpdates.goals = body.goals;
 
-    if (posts.length > 0) {
-      const rows = posts.map((post) => ({
-        project_id: projectId,
-        user_id: user.userId,
-        content: post.hook + "\n\n" + post.body,
-        hook: post.hook,
-        post_type: "story",
-        virality_score: post.viralityScore ?? 0,
-        authority_score: post.authorityScore ?? 0,
-        comment_potential: post.commentPotential ?? 0,
-        readability_score: post.readabilityScore ?? 0,
-        image_prompt: post.imagePrompt,
-        status: post.status || "draft",
-      }));
+    if (Object.keys(projectUpdates).length > 0) {
+      await supabase.from("projects").update(projectUpdates).eq("id", projectId).eq("user_id", user.userId);
+    }
 
-      await supabase.from("posts").insert(rows);
+    if (body.posts) {
+      await supabase
+        .from("posts")
+        .delete()
+        .eq("project_id", projectId)
+        .eq("user_id", user.userId);
+
+      if (body.posts.length > 0) {
+        const rows = body.posts.map((post) => ({
+          project_id: projectId,
+          user_id: user.userId,
+          content: post.hook + "\n\n" + post.body,
+          hook: post.hook,
+          post_type: "story",
+          virality_score: post.viralityScore ?? 0,
+          authority_score: post.authorityScore ?? 0,
+          comment_potential: post.commentPotential ?? 0,
+          readability_score: post.readabilityScore ?? 0,
+          image_prompt: post.imagePrompt,
+          status: post.status || "draft",
+        }));
+
+        await supabase.from("posts").insert(rows);
+      }
     }
 
     return Response.json({ success: true });

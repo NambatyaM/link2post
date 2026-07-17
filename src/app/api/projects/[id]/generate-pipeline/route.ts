@@ -178,7 +178,20 @@ export async function POST(
       .eq("id", projectId).eq("user_id", user.userId).single();
 
     if (fetchError || !project) return Response.json({ error: "Project not found" }, { status: 404 });
-    if (project.status === "completed") return Response.json({ error: "Already completed" }, { status: 400 });
+
+    const { count: postCount } = await supabase
+      .from("posts").select("id", { count: "exact", head: true })
+      .eq("project_id", projectId).eq("user_id", user.userId);
+
+    if (project.status === "completed" && (postCount ?? 0) > 0) {
+      return Response.json({ error: "Already completed" }, { status: 400 });
+    }
+
+    if ((postCount ?? 0) > 0) {
+      await supabase.from("posts").delete().eq("project_id", projectId).eq("user_id", user.userId);
+    }
+
+    await supabase.from("projects").update({ status: "processing" }).eq("id", projectId).eq("user_id", user.userId);
 
     const providers = getAvailableProviders();
     if (providers.length === 0) {
