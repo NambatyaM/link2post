@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { extractBearerToken, verifyToken } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { SYSTEM_PROMPT, buildYouTubePrompt } from "@/lib/prompts";
+import { SYSTEM_PROMPT, buildContentPrompt } from "@/lib/prompts";
 import { recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
 import { createThinkingFilter } from "@/lib/thinking-filter";
 import { getRouteForTask } from "@/services/ai";
@@ -22,13 +22,12 @@ export async function POST(
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const { id: projectId } = await params;
-    const { niche: _niche, audience, voiceProfilePrompt } = await req.json() as {
-      niche?: string;
+    const { audience, voiceProfilePrompt } = await req.json() as {
       audience?: string;
       voiceProfilePrompt?: string;
     };
 
-    const supabase = getSupabaseServer();
+    const supabase = getSupabaseServer(req);
 
     const { data: project, error: fetchError } = await supabase
       .from("projects")
@@ -77,7 +76,7 @@ export async function POST(
       async start(controller) {
         for (const route of routes) {
           try {
-            const userPrompt = buildYouTubePrompt(videoInfo, "UTC", audience, voiceProfilePrompt);
+            const userPrompt = buildContentPrompt(videoInfo, "UTC", audience, voiceProfilePrompt);
             const baseUrl = getProviderBaseUrl(route.provider);
             const apiKey = getProviderApiKey(route.provider);
             if (!apiKey) continue;
@@ -140,9 +139,9 @@ export async function POST(
                 for (const line of lines) {
                   const result = parseSSEChunk(line);
                   if (result.done) {
+                    await saveGeneratedContent(supabase, projectId, user.userId, accumulatedContent, "completed");
                     controller.enqueue(encoder.encode("data: [DONE]\n\n"));
                     controller.close();
-                    await saveGeneratedContent(supabase, projectId, user.userId, accumulatedContent, "completed");
                     return;
                   }
                   if (result.content) {
@@ -166,9 +165,9 @@ export async function POST(
               clearInterval(stallCheck);
             }
 
+            await saveGeneratedContent(supabase, projectId, user.userId, accumulatedContent, "completed");
             controller.enqueue(encoder.encode("data: [DONE]\n\n"));
             controller.close();
-            await saveGeneratedContent(supabase, projectId, user.userId, accumulatedContent, "completed");
             return;
           } catch {
             continue;

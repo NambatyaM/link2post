@@ -1,6 +1,6 @@
 import { task, metadata } from "@trigger.dev/sdk/v3";
 import { getSupabaseServer } from "@/lib/supabase-server";
-import { buildYouTubePrompt, SYSTEM_PROMPT } from "@/lib/prompts";
+import { buildContentPrompt, SYSTEM_PROMPT } from "@/lib/prompts";
 import { buildAttempts, fetchWithTimeout, recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
 import { validateLinkedInResult } from "@/lib/validate";
 import type { VideoInfo, LinkedInResult, LinkedInPost } from "@/lib/types";
@@ -62,7 +62,7 @@ export const generateContentTask = task({
     // Step 2: Build the prompt
     await updateProgress("build_prompt", 15, "Building AI prompt");
 
-    const userPrompt = buildYouTubePrompt(videoInfo, "UTC", audience, voiceProfilePrompt);
+    const userPrompt = buildContentPrompt(videoInfo, "UTC", audience, voiceProfilePrompt);
 
     // Step 3: Call the AI provider
     await updateProgress("call_ai", 25, "Calling AI provider");

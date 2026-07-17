@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { extractBearerToken, verifyToken } from "@/lib/auth";
+import { authenticateRequest, unauthorized } from "@/lib/with-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import {
   SYSTEM_PROMPT,
@@ -7,148 +7,15 @@ import {
   buildPostsPrompt,
   buildArticlesCalendarPrompt,
 } from "@/lib/prompts";
-import { getProviderBaseUrl, getProviderApiKey, getProviderHeaders } from "@/services/ai/providers/shared";
 import type { VideoInfo } from "@/lib/types";
 import { generateFullLinkedInResponse } from "@/lib/local-generator";
+import { getAvailableProviders, callAI } from "@/lib/pipeline/orchestrator";
+import { parseJsonResponse } from "@/lib/pipeline/parsers";
+import { savePosts } from "@/lib/pipeline/saver";
+import { GeneratePipelineParamsSchema, GeneratePipelineBodySchema } from "@/lib/pipeline/validation";
+import type { AnalysisResult, PostsResult, ArticlesCalendarResult } from "@/lib/pipeline/types";
 
 export const maxDuration = 120;
-
-const CALL_TIMEOUT_MS = 10_000;
-
-function parseJsonResponse<T>(raw: string): T | null {
-  let cleaned = raw.trim();
-  if (cleaned.startsWith("```")) {
-    cleaned = cleaned.replace(/^```(?:json)?\n?/, "").replace(/\n?```$/, "");
-  }
-  try { return JSON.parse(cleaned) as T; } catch {
-    const jsonStart = cleaned.indexOf("{");
-    const jsonEnd = cleaned.lastIndexOf("}");
-    if (jsonStart !== -1 && jsonEnd > jsonStart) {
-      try { return JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1)) as T; } catch { return null; }
-    }
-    return null;
-  }
-}
-
-function getAvailableProviders(): Array<{ id: string; model: string }> {
-  const providers: Array<{ id: string; model: string }> = [];
-  const tryProviders = [
-    { id: "gemini", model: "gemini-2.0-flash", envKey: "GEMINI_API_KEY" },
-    { id: "groq", model: "llama-3.3-70b-versatile", envKey: "GROQ_API_KEY" },
-    { id: "openrouter", model: "qwen/qwen-2.5-72b-instruct", envKey: "OPENROUTER_API_KEY" },
-    { id: "cerebras", model: "llama-3.3-70b", envKey: "CEREBRAS_API_KEY" },
-    { id: "mistral", model: "mistral-small-latest", envKey: "MISTRAL_API_KEY" },
-    { id: "tokengo", model: "deepseek-v4-flash", envKey: "THORBASE_API_KEY" },
-  ];
-  for (const p of tryProviders) {
-    if (process.env[p.envKey]) providers.push({ id: p.id, model: p.model });
-  }
-  return providers;
-}
-
-async function callAI(
-  taskLabel: string,
-  providers: Array<{ id: string; model: string }>,
-  messages: Array<{ role: string; content: string }>,
-  maxTokens: number,
-): Promise<{ content: string; provider: string; model: string; latencyMs: number }> {
-  const errors: string[] = [];
-
-  for (const provider of providers) {
-    const baseUrl = getProviderBaseUrl(provider.id);
-    const apiKey = getProviderApiKey(provider.id);
-    if (!apiKey) {
-      errors.push(`${provider.id}: no API key`);
-      continue;
-    }
-
-    const start = Date.now();
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), CALL_TIMEOUT_MS);
-
-    try {
-      console.log(`[pipeline:${taskLabel}] Trying ${provider.id}/${provider.model}`);
-      const response = await fetch(baseUrl, {
-        method: "POST",
-        headers: getProviderHeaders(provider.id, apiKey),
-        body: JSON.stringify({
-          model: provider.model,
-          messages,
-          temperature: 0.7,
-          max_tokens: maxTokens,
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timer);
-
-      if (!response.ok) {
-        const errText = await response.text().catch(() => "");
-        errors.push(`${provider.id}: HTTP ${response.status} ${errText.slice(0, 100)}`);
-        console.warn(`[pipeline:${taskLabel}] ${provider.id} HTTP ${response.status}`);
-        continue;
-      }
-
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || "";
-      const latencyMs = Date.now() - start;
-
-      if (!content.trim()) {
-        errors.push(`${provider.id}: empty content`);
-        continue;
-      }
-
-      console.log(`[pipeline:${taskLabel}] Success: ${provider.id}/${provider.model} in ${latencyMs}ms`);
-      return { content, provider: provider.id, model: provider.model, latencyMs };
-    } catch (err) {
-      clearTimeout(timer);
-      const msg = err instanceof Error ? err.message : String(err);
-      errors.push(`${provider.id}: ${msg}`);
-      console.warn(`[pipeline:${taskLabel}] ${provider.id} failed: ${msg}`);
-    }
-  }
-
-  throw new Error(`[pipeline:${taskLabel}] All providers failed: ${errors.join("; ")}`);
-}
-
-async function savePosts(
-  supabase: ReturnType<typeof getSupabaseServer>,
-  projectId: string,
-  userId: string,
-  posts: Array<{ hook: string; body: string; imagePrompt: string; viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number }>,
-) {
-  if (posts.length === 0) return;
-  const rows = posts.map((p) => ({
-    project_id: projectId, user_id: userId,
-    content: p.hook + "\n\n" + p.body, hook: p.hook, post_type: "story",
-    virality_score: p.viralityScore ?? 0, authority_score: p.authorityScore ?? 0,
-    comment_potential: p.commentPotential ?? 0, readability_score: p.readabilityScore ?? 0,
-    image_prompt: p.imagePrompt, status: "draft",
-  }));
-  await supabase.from("posts").insert(rows);
-}
-
-interface AnalysisResult {
-  cleaned_transcript: string;
-  voice_profile: Record<string, unknown>;
-  ideas: Array<{
-    title: string; insight: string; quote: string;
-    viralityScore: number; authorityScore: number; commentPotential: number; suggestedType: string;
-  }>;
-}
-
-interface PostsResult {
-  posts: Array<{
-    hook: string; body: string; imagePrompt: string; postType: string;
-    viralityScore: number; authorityScore: number; commentPotential: number; readabilityScore: number;
-  }>;
-}
-
-interface ArticlesCalendarResult {
-  articles: Array<{ title: string; body: string; imagePrompts: string[] }>;
-  carousel: { title: string; slides: Array<{ slideNumber: number; title: string; body: string; notes: string }> };
-  calendar: Array<{ day: string; date: string; type: string; title: string; contentIndex: number; recommendedTime: string; note: string }>;
-}
 
 export async function POST(
   req: NextRequest,
@@ -157,16 +24,25 @@ export async function POST(
   let projectId = "";
   let userId = "";
   try {
-    const token = extractBearerToken(req);
-    if (!token) return Response.json({ error: "Unauthorized" }, { status: 401 });
-    const user = await verifyToken(token);
-    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-    userId = userId;
+    const user = await authenticateRequest(req);
+    if (!user) return unauthorized();
+    userId = user.userId;
 
-    projectId = (await params).id;
-    const { audience } = (await req.json()) as { audience?: string };
+    const rawParams = await params;
+    const parsedParams = GeneratePipelineParamsSchema.safeParse(rawParams);
+    if (!parsedParams.success) {
+      return Response.json({ error: "Invalid project ID", detail: parsedParams.error.flatten() }, { status: 400 });
+    }
+    projectId = parsedParams.data.id;
 
-    const supabase = getSupabaseServer();
+    const rawBody = await req.json();
+    const parsedBody = GeneratePipelineBodySchema.safeParse(rawBody);
+    if (!parsedBody.success) {
+      return Response.json({ error: "Invalid request body", detail: parsedBody.error.flatten() }, { status: 400 });
+    }
+    const { voiceProfilePrompt } = parsedBody.data;
+
+    const supabase = getSupabaseServer(req);
     const { data: project, error: fetchError } = await supabase
       .from("projects").select("id, title, raw_transcript, status")
       .eq("id", projectId).eq("user_id", userId).single();
@@ -197,6 +73,10 @@ export async function POST(
     const videoInfo: VideoInfo = { title: project.title, description: "", transcript: project.raw_transcript, url: "", videoId: "" };
     const allContent = { posts: [] as PostsResult["posts"], articles: [] as ArticlesCalendarResult["articles"] };
 
+    const systemPrompt = voiceProfilePrompt
+      ? `${voiceProfilePrompt}\n\n---\n\n${SYSTEM_PROMPT}`
+      : SYSTEM_PROMPT;
+
     // ═══════════════════════════════════════════════════════════════
     // CALL 1: Analysis (with local fallback on total AI failure)
     // ═══════════════════════════════════════════════════════════════
@@ -208,7 +88,7 @@ export async function POST(
 
     try {
       analysisResult = await callAI("analysis", providers, [
-        { role: "system", content: SYSTEM_PROMPT },
+        { role: "system", content: systemPrompt },
         { role: "user", content: analysisPrompt },
       ], 6000);
 
@@ -260,44 +140,68 @@ export async function POST(
     if (usedLocalFallback) {
       console.log("[pipeline] Skipping AI Calls 2 & 3 — using local fallback content");
     } else {
-    const postsPrompt = buildPostsPrompt(analysis.voice_profile, analysis.ideas, 5);
-    const articlesPrompt = buildArticlesCalendarPrompt(analysis.voice_profile, [], analysis.ideas, 2);
+      const postsPrompt = buildPostsPrompt(analysis.voice_profile, analysis.ideas, 5);
+      const articlesPrompt = buildArticlesCalendarPrompt(analysis.voice_profile, [], analysis.ideas, 2);
 
-    const postsMessages = [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: postsPrompt },
-    ];
-    const articlesMessages = [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: articlesPrompt },
-    ];
+      const postsMessages = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: postsPrompt },
+      ];
+      const articlesMessages = [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: articlesPrompt },
+      ];
 
-    const [postsResult, articlesResult] = await Promise.all([
-      callAI("posts", providers, postsMessages, 6000).catch((e) => { console.error("[pipeline] Posts failed:", e.message); return null; }),
-      callAI("articles", providers, articlesMessages, 8000).catch((e) => { console.error("[pipeline] Articles failed:", e.message); return null; }),
-    ]);
+      const [postsResult, articlesResult] = await Promise.all([
+        callAI("posts", providers, postsMessages, 6000).catch((e) => { console.error("[pipeline] Posts failed:", e.message); return null; }),
+        callAI("articles", providers, articlesMessages, 8000).catch((e) => { console.error("[pipeline] Articles failed:", e.message); return null; }),
+      ]);
 
-    if (postsResult) {
-      const postsData = parseJsonResponse<PostsResult>(postsResult.content);
-      if (postsData?.posts) {
-        allContent.posts = postsData.posts;
-        console.log(`[pipeline] Call 2 done: ${postsResult.provider}/${postsResult.model} in ${postsResult.latencyMs}ms, ${postsData.posts.length} posts`);
+      if (postsResult) {
+        const postsData = parseJsonResponse<PostsResult>(postsResult.content);
+        if (postsData?.posts) {
+          allContent.posts = postsData.posts;
+          console.log(`[pipeline] Call 2 done: ${postsResult.provider}/${postsResult.model} in ${postsResult.latencyMs}ms, ${postsData.posts.length} posts`);
+        }
       }
-    }
 
-    if (articlesResult) {
-      const articlesData = parseJsonResponse<ArticlesCalendarResult>(articlesResult.content);
-      if (articlesData) {
-        allContent.articles = articlesData.articles || [];
-        console.log(`[pipeline] Call 3 done: ${articlesResult.provider}/${articlesResult.model} in ${articlesResult.latencyMs}ms`);
+      if (articlesResult) {
+        const articlesData = parseJsonResponse<ArticlesCalendarResult>(articlesResult.content);
+        if (articlesData) {
+          allContent.articles = articlesData.articles || [];
+          console.log(`[pipeline] Call 3 done: ${articlesResult.provider}/${articlesResult.model} in ${articlesResult.latencyMs}ms`);
+        }
       }
-    }
+
+      // Fallback: if posts are empty but we have analysis data, supplement with local generator
+      if (allContent.posts.length === 0) {
+        console.warn("[pipeline] No posts from AI, using local generator fallback");
+        const localResult = generateFullLinkedInResponse(videoInfo);
+        allContent.posts = localResult.posts.map((p) => ({
+          hook: p.hook, body: p.body, imagePrompt: p.imagePrompt,
+          postType: "story", viralityScore: 70, authorityScore: 65,
+          commentPotential: 60, readabilityScore: 70,
+        }));
+        if (allContent.articles.length === 0) {
+          allContent.articles = localResult.articles.map((a) => ({
+            title: a.title, body: a.body, imagePrompts: a.imagePrompts,
+          }));
+        }
+      }
     }
 
     // ═══════════════════════════════════════════════════════════════
     // SAVE & COMPLETE
     // ═══════════════════════════════════════════════════════════════
-    await savePosts(supabase, projectId, userId, allContent.posts);
+    try {
+      await savePosts(supabase, projectId, userId, allContent.posts);
+    } catch (saveError) {
+      const msg = saveError instanceof Error ? saveError.message : "Failed to save posts";
+      console.error("[pipeline] Save failed:", msg);
+      await supabase.from("projects").update({ status: "failed" }).eq("id", projectId).eq("user_id", userId);
+      return Response.json({ error: msg }, { status: 500 });
+    }
+
     await supabase.from("projects").update({ status: "completed" }).eq("id", projectId).eq("user_id", userId);
 
     console.log(`[pipeline] Complete: ${allContent.posts.length} posts, ${allContent.articles.length} articles`);
@@ -310,7 +214,7 @@ export async function POST(
   } catch (error) {
     console.error("[pipeline] Fatal:", error);
     try {
-      const supabase = getSupabaseServer();
+      const supabase = getSupabaseServer(req);
       await supabase.from("projects").update({ status: "failed" }).eq("id", projectId).eq("user_id", userId);
     } catch { /* */ }
     return Response.json({ error: error instanceof Error ? error.message : "Generation failed" }, { status: 500 });

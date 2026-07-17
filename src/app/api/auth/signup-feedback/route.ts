@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
       improvement?: string;
     };
 
-    const supabase = getSupabaseServer();
+    const supabase = getSupabaseServer(req);
     const { error } = await supabase.from("signup_feedback").insert({
       user_id: user.userId,
       hear_about: (hearAbout || "").slice(0, 500),

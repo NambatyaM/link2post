@@ -24,13 +24,30 @@ function getLimitForPlan(plan: Plan): number {
   }
 }
 
+async function getUserPlan(userId: string): Promise<Plan> {
+  try {
+    const supabase = getSupabaseServer();
+    const { data: profile } = await supabase
+      .from("user_profiles")
+      .select("plan")
+      .eq("id", userId)
+      .maybeSingle();
+    if (profile?.plan === "starter" || profile?.plan === "pro") {
+      return profile.plan;
+    }
+  } catch { /* fall through to default */ }
+  return "free";
+}
+
 export async function checkRateLimit(opts: {
   userId?: string;
   deviceId?: string;
   plan?: Plan;
 }): Promise<RateLimitResult> {
-  const { userId, deviceId, plan = "anonymous" } = opts;
+  const { userId, deviceId } = opts;
   const supabase = getSupabaseServer();
+
+  const plan = opts.plan || (userId ? await getUserPlan(userId) : "anonymous");
 
   if (plan === "pro") {
     return { allowed: true, remaining: Infinity, retryAfterMs: 0, limit: Infinity, plan };

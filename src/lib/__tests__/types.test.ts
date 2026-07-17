@@ -1,8 +1,8 @@
 import { LinkedInResult, POSTING_SCHEDULE, TIMEZONE_OPTIONS } from "@/lib/types";
 
 describe("types", () => {
-  it("POSTING_SCHEDULE has 4 days", () => {
-    expect(POSTING_SCHEDULE).toHaveLength(4);
+  it("POSTING_SCHEDULE has 5 days", () => {
+    expect(POSTING_SCHEDULE).toHaveLength(5);
   });
 
   it("each posting slot has required fields", () => {

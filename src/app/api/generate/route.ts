@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { SYSTEM_PROMPT, PROMPTS, buildYouTubePrompt } from "@/lib/prompts";
+import { SYSTEM_PROMPT, PROMPTS, buildContentPrompt } from "@/lib/prompts";
 import { checkRateLimit, getRateLimitHeaders, recordGeneration } from "@/lib/rate-limit";
 import { verifyToken, extractBearerToken } from "@/lib/auth";
 import { validateLinkedInResult, type ValidationError } from "@/lib/validate";
@@ -280,7 +280,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ result, validation }, { status: 200, headers: responseHeaders });
     }
 
-    const userPrompt = buildYouTubePrompt(videoInfo, timezone, audience);
+    const userPrompt = buildContentPrompt(videoInfo, timezone, audience);
     const stream = await streamCompletion(SYSTEM_PROMPT, userPrompt, videoInfo, "content_calendar", providerId, modelId);
     const durationMs = Date.now() - genStart;
     recordGenerationEvent({
@@ -310,7 +310,7 @@ export async function generateAndValidate(
   timezone: string,
   audience?: string,
 ): Promise<{ result: LinkedInResult; validation: ReturnType<typeof validateLinkedInResult> }> {
-  const userPrompt = buildYouTubePrompt(videoInfo, timezone, audience);
+  const userPrompt = buildContentPrompt(videoInfo, timezone, audience);
 
   try {
     const routeResult = await routeTask("content_calendar", userPrompt, SYSTEM_PROMPT);

@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     const user = await verifyToken(token);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const supabase = getSupabaseServer();
+    const supabase = getSupabaseServer(req);
 
     const { data: projects, error: projectsError } = await supabase
       .from("projects")
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "title and transcript are required" }, { status: 400 });
     }
 
-    const supabase = getSupabaseServer();
+    const supabase = getSupabaseServer(req);
 
     const { data, error } = await supabase
       .from("projects")

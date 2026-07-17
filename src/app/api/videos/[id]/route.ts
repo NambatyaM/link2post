@@ -13,7 +13,7 @@ export async function DELETE(
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const { id } = await params;
-    const supabase = getSupabaseServer();
+    const supabase = getSupabaseServer(req);
 
     const { error } = await supabase
       .from("videos")

@@ -1,4 +1,5 @@
 export interface LinkedInPost {
+  id?: string;
   hook: string;
   body: string;
   imagePrompt: string;

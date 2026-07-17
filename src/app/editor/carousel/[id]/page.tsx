@@ -63,6 +63,8 @@ async function generateSlides(transcript: string, projectId: string): Promise<Ca
   return data.slides || [];
 }
 
+const STORAGE_KEY_PREFIX = "link2post_carousel_";
+
 function EditorPageContent({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [slides, setSlides] = useState<CarouselSlide[]>([]);
@@ -70,11 +72,32 @@ function EditorPageContent({ projectId }: { projectId: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [generating, setGenerating] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  // Auto-save to localStorage whenever slides change
+  useEffect(() => {
+    if (slides.length > 0) {
+      localStorage.setItem(STORAGE_KEY_PREFIX + projectId, JSON.stringify(slides));
+    }
+  }, [slides, projectId]);
 
   const loadAndGenerate = useCallback(async () => {
     try {
       setLoading(true);
       setError("");
+
+      // Check localStorage first
+      const cached = localStorage.getItem(STORAGE_KEY_PREFIX + projectId);
+      if (cached) {
+        try {
+          const parsed = JSON.parse(cached) as CarouselSlide[];
+          if (parsed.length > 0) {
+            setSlides(parsed);
+            setLoading(false);
+            return;
+          }
+        } catch { /* ignore corrupt cache */ }
+      }
 
       const project = await fetchProject(projectId);
       if (!project) {
@@ -108,6 +131,24 @@ function EditorPageContent({ projectId }: { projectId: string }) {
   useEffect(() => {
     loadAndGenerate();
   }, [loadAndGenerate]);
+
+  const handleSave = useCallback(async () => {
+    try {
+      const supabase = getSupabaseBrowser();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const res = await fetch(`/api/projects/${projectId}`, {
+        method: "PATCH",
+        headers: { Authorization: `Bearer ${session.access_token}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ carousel_slides: slides }),
+      });
+      if (res.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
+    } catch { /* */ }
+  }, [projectId, slides]);
 
   if (loading || generating) {
     return (
@@ -190,6 +231,15 @@ function EditorPageContent({ projectId }: { projectId: string }) {
           </svg>
         </button>
         <span className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>{title}</span>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={handleSave}
+            className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+            style={{ background: saved ? "var(--success)" : "var(--bg-tertiary)", color: saved ? "white" : "var(--text-muted)" }}
+          >
+            {saved ? "Saved" : "Save"}
+          </button>
+        </div>
       </div>
       <div className="flex-1 min-h-0">
         <CarouselEditor

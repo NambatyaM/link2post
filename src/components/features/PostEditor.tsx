@@ -275,6 +275,55 @@ export default function PostEditor({ post, index, onUpdate, onSave, onApprove, o
           </button>
         </div>
       </div>
+
+      <FeedbackButtons postId={post.id} />
+    </div>
+  );
+}
+
+function FeedbackButtons({ postId }: { postId?: string }) {
+  const [rating, setRating] = useState<"up" | "down" | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const submitFeedback = async (value: "up" | "down") => {
+    if (!postId || saving) return;
+    setSaving(true);
+    setRating(value);
+    try {
+      const supabase = (await import("@/lib/supabase-browser")).getSupabaseBrowser();
+      const { data: { session } } = await supabase.auth.getSession();
+      await fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ postId, rating: value }),
+      });
+    } catch { /* */ }
+    setSaving(false);
+  };
+
+  return (
+    <div className="flex items-center justify-end gap-2 pt-2" style={{ borderTop: "1px solid var(--border)" }}>
+      <span className="text-[11px]" style={{ color: "var(--text-muted)" }}>Was this post helpful?</span>
+      <button
+        onClick={() => submitFeedback("up")}
+        className="p-1 rounded transition-colors"
+        style={{ color: rating === "up" ? "var(--success)" : "var(--text-muted)" }}
+        title="Good post"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill={rating === "up" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 9V5a3 3 0 0 0-3-3l-4 9v11h11.28a2 2 0 0 0 2-1.7l1.38-9a2 2 0 0 0-2-2.3zM7 22H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2h3" />
+        </svg>
+      </button>
+      <button
+        onClick={() => submitFeedback("down")}
+        className="p-1 rounded transition-colors"
+        style={{ color: rating === "down" ? "var(--error)" : "var(--text-muted)" }}
+        title="Needs improvement"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill={rating === "down" ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M10 15v4a3 3 0 0 0 3 3l4-9V2H5.72a2 2 0 0 0-2 1.7l-1.38 9a2 2 0 0 0 2 2.3zm7-13h2.67A2.31 2.31 0 0 1 22 4v7a2.31 2.31 0 0 1-2.33 2H17" />
+        </svg>
+      </button>
     </div>
   );
 }

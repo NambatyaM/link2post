@@ -48,16 +48,15 @@ function hashCode(str: string): number {
 }
 
 function buildHookFromTranscript(sentences: string[], numbers: string[], seed: number): string {
-  const bestSentence = sentences[seed % sentences.length] || "This changes everything";
+  const bestSentence = sentences[seed % sentences.length] || "Most people miss this";
   const truncated = bestSentence.length > 80 ? bestSentence.slice(0, 77) + "..." : bestSentence;
   const num = numbers[seed % numbers.length] || "";
 
   const patterns = [
-    `"${truncated}"`,
-    num ? `${num} — and here's why that matters:` : `"${truncated}" — here's why that matters:`,
-    `I couldn't ignore this: "${truncated.toLowerCase()}"`,
-    `This stuck with me: "${truncated.toLowerCase()}"`,
-    `"${truncated}" — most people miss this.`,
+    num ? `${num}: the number that changed my approach.` : `${truncated}`,
+    num ? `I spent years ignoring ${num}. Here's why I was wrong.` : `${truncated}`,
+    `Stop doing this: "${truncated.toLowerCase()}"`,
+    `${truncated} No one talks about this.`,
   ];
 
   return patterns[seed % patterns.length];
@@ -85,14 +84,12 @@ function buildPostBodyFromTranscript(
   }
   paragraphs.push(detail2.endsWith(".") ? detail2 : detail2 + ".");
   paragraphs.push("");
-  paragraphs.push("This isn't theory. This is what actually works when you pay attention to the details.");
-
   return paragraphs.join("\n");
 }
 
 function buildImagePromptFromTranscript(sentence: string, keyphrase: string): string {
   const shortSentence = sentence.length > 60 ? sentence.slice(0, 57) + "..." : sentence;
-  return `A clean, minimal visual showing: "${shortSentence}" — centered on the theme of "${keyphrase}", modern editorial style, warm tones, professional LinkedIn aesthetic, slight depth of field, text overlay with the key insight.`;
+  return `A clean, minimal visual on the theme of "${keyphrase}", modern editorial photography style, warm natural lighting, shallow depth of field, professional LinkedIn aesthetic, no text in image.`;
 }
 
 function buildArticleBodyFromTranscript(

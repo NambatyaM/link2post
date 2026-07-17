@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     const user = await verifyToken(token);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const supabase = getSupabaseServer();
+    const supabase = getSupabaseServer(req);
 
     const { data: existing } = await supabase
       .from("referral_codes")

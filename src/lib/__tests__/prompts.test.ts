@@ -1,13 +1,16 @@
-import { SYSTEM_PROMPT, buildYouTubePrompt, buildRegeneratePrompt, VIDEO_SCRIPT_SYSTEM_PROMPT, CAROUSEL_SYSTEM_PROMPT, buildVideoScriptPrompt, buildCarouselPrompt } from "@/lib/prompts";
+import { SYSTEM_PROMPT, buildContentPrompt, buildRegeneratePrompt, VIDEO_SCRIPT_SYSTEM_PROMPT, CAROUSEL_SYSTEM_PROMPT, buildVideoScriptPrompt, buildCarouselPrompt } from "@/lib/prompts";
 
 describe("prompts", () => {
   it("SYSTEM_PROMPT contains all rule sections", () => {
     const sections = [
-      "TRANSCRIPT INTAKE",
-      "POST GENERATION RULES",
-      "ARTICLE GENERATION RULES",
-      "IMAGE PROMPT RULES",
-      "CALENDAR ASSEMBLY RULES",
+      "TRANSCRIPT INGESTION & CLEANING",
+      "VOICE & TONE ANALYSIS",
+      "IDEA EXTRACTION",
+      "TOPIC RANKING & VIRALITY PREDICTION",
+      "CONTENT GENERATION",
+      "VISUAL STRATEGY GENERATION",
+      "QUALITY REVIEW",
+      "CALENDAR GENERATION",
       "OUTPUT FORMAT",
     ];
     for (const s of sections) {
@@ -17,10 +20,9 @@ describe("prompts", () => {
 
   it("SYSTEM_PROMPT contains post constraints", () => {
     expect(SYSTEM_PROMPT).toContain("1,000-1,300 characters");
-    expect(SYSTEM_PROMPT).toContain("Hashtags: zero, or maximum 2");
-    expect(SYSTEM_PROMPT).toContain("No external links");
-    expect(SYSTEM_PROMPT).toContain("No engagement-bait");
-    expect(SYSTEM_PROMPT).toContain("1-2 sentences per paragraph");
+    expect(SYSTEM_PROMPT).toContain("No hashtags, no emojis");
+    expect(SYSTEM_PROMPT).toContain("Hook under 10 words");
+    expect(SYSTEM_PROMPT).toContain("max 2 sentences each");
   });
 
   it("SYSTEM_PROMPT contains article constraints", () => {
@@ -33,11 +35,11 @@ describe("prompts", () => {
   it("SYSTEM_PROMPT contains calendar rules", () => {
     expect(SYSTEM_PROMPT).toContain("Wednesday");
     expect(SYSTEM_PROMPT).toContain("24 hours");
-    expect(SYSTEM_PROMPT).toContain("recommended time window");
+    expect(SYSTEM_PROMPT).toContain("recommended TIME WINDOWS");
   });
 
-  it("buildYouTubePrompt includes video info and timezone", () => {
-    const result = buildYouTubePrompt(
+  it("buildContentPrompt includes video info and timezone", () => {
+    const result = buildContentPrompt(
       { title: "Test Video", description: "A test", transcript: "Hello world transcript", url: "https://youtube.com/watch?v=abc", videoId: "abc" },
       "America/New_York",
       "B2B founders",
@@ -52,8 +54,8 @@ describe("prompts", () => {
     expect(result).toContain("STEP 3");
   });
 
-  it("buildYouTubePrompt works without audience", () => {
-    const result = buildYouTubePrompt(
+  it("buildContentPrompt works without audience", () => {
+    const result = buildContentPrompt(
       { title: "Video", description: "Desc", transcript: "Transcript text here", url: "https://youtube.com/watch?v=x", videoId: "x" },
       "Europe/London",
     );
@@ -62,8 +64,8 @@ describe("prompts", () => {
     expect(result).not.toContain("TARGET AUDIENCE");
   });
 
-  it("buildYouTubePrompt includes upcoming dates", () => {
-    const result = buildYouTubePrompt(
+  it("buildContentPrompt includes upcoming dates", () => {
+    const result = buildContentPrompt(
       { title: "V", description: "D", transcript: "T", url: "u", videoId: "x" },
       "America/New_York",
     );

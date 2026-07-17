@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "Missing itemId or field" }, { status: 400 });
     }
 
-    const supabase = getSupabaseServer();
+    const supabase = getSupabaseServer(req);
 
     const { error } = await supabase
       .from("copy_events")

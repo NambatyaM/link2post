@@ -13,7 +13,7 @@ const VOICE_PROFILE_KEY = "link2post_brand_voice";
 const VOICE_PROMPT_KEY = "link2post_voice_prompt";
 
 const CONTENT_TABS: { key: ContentInputType; label: string }[] = [
-  { key: "youtube_transcript", label: "YouTube Transcript" },
+  { key: "youtube_transcript", label: "Transcript" },
   { key: "podcast_transcript", label: "Podcast Transcript" },
   { key: "blog", label: "Blog Post" },
   { key: "linkedin_posts", label: "LinkedIn Posts" },
@@ -33,7 +33,7 @@ const CONTENT_HELPERS: Record<ContentInputType, string> = {
 };
 
 const PLACEHOLDERS: Record<ContentInputType, string> = {
-  youtube_transcript: "Paste a YouTube video transcript...",
+  youtube_transcript: "Paste a transcript from a video, talk, or any spoken content...",
   podcast_transcript: "Paste a podcast transcript...",
   blog: "Paste a blog post or article...",
   linkedin_posts: "Paste 5-10 of your LinkedIn posts separated by ---",

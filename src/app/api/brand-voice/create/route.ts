@@ -87,7 +87,18 @@ export async function POST(req: NextRequest) {
 
     if (userId && hasRealData) {
       try {
-        const supabase = getSupabaseServer();
+        const supabase = getSupabaseServer(req);
+        const { data: existing } = await supabase
+          .from("brand_voice_profiles")
+          .select("content_sources")
+          .eq("user_id", userId)
+          .maybeSingle();
+
+        const existingSources: string[] = (existing?.content_sources as string[]) || [];
+        const mergedSources = existingSources.includes(contentType || "general")
+          ? existingSources
+          : [...existingSources, contentType || "general"];
+
         await supabase.from("brand_voice_profiles").upsert({
           user_id: userId,
           tone: response.tone,
@@ -101,7 +112,7 @@ export async function POST(req: NextRequest) {
           formatting_style: response.formattingStyle,
           common_phrases: response.commonPhrases,
           favorite_emojis: response.favoriteEmojis,
-          content_sources: [contentType || "general"],
+          content_sources: mergedSources,
           post_count_analyzed: content.split(/\n\n+/).length,
           voice_prompt: voicePrompt,
           updated_at: new Date().toISOString(),

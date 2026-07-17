@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const contentType = req.nextUrl.searchParams.get("content_type");
-    const supabase = getSupabaseServer();
+    const supabase = getSupabaseServer(req);
 
     let query = supabase
       .from("brand_voice_memories")
@@ -76,7 +76,7 @@ export async function DELETE(req: NextRequest) {
       return Response.json({ error: "id is required" }, { status: 400 });
     }
 
-    const supabase = getSupabaseServer();
+    const supabase = getSupabaseServer(req);
     const { error } = await supabase
       .from("brand_voice_memories")
       .delete()
