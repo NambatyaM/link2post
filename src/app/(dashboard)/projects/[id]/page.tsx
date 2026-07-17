@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useCallback, Suspense } from "react";
+import { use, useState, useCallback, useRef, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import type { Project, LinkedInPost } from "@/lib/types";
@@ -41,6 +41,7 @@ function ProjectContent({ projectId }: { projectId: string }) {
   const [saveMessage, setSaveMessage] = useState("");
   const [generating, setGenerating] = useState(false);
   const [generateProgress, setGenerateProgress] = useState("");
+  const postsReceivedRef = useRef(false);
 
   const handleUpdatePost = useCallback((index: number, updated: LinkedInPost) => {
     setPosts((prev) => {
@@ -126,6 +127,7 @@ function ProjectContent({ projectId }: { projectId: string }) {
   const handleGenerate = useCallback(async () => {
     if (!project || generating) return;
     setGenerating(true);
+    postsReceivedRef.current = false;
     setGenerateProgress("Starting generation...");
 
     try {
@@ -193,6 +195,7 @@ function ProjectContent({ projectId }: { projectId: string }) {
                   status: "draft" as const,
                 }));
                 setPosts(newPosts);
+                postsReceivedRef.current = true;
                 if (newPosts.length > 0) setSelectedIndex(0);
               }
               setGenerateProgress(`Posts ready (${parsed.latencyMs}ms) — generating articles...`);
@@ -212,8 +215,8 @@ function ProjectContent({ projectId }: { projectId: string }) {
       }
 
       setGenerateProgress("");
-      setSaveMessage("Content generated!");
-      setTimeout(() => setSaveMessage(""), 2000);
+      setSaveMessage(postsReceivedRef.current ? "Content generated!" : "Generation finished but no posts — check API keys in Vercel");
+      setTimeout(() => setSaveMessage(""), 3000);
     } catch (err) {
       setGenerateProgress("");
       setSaveMessage(err instanceof Error ? err.message : "Generation failed");
