@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useCallback, useRef, Suspense } from "react";
+import { use, useState, useCallback, useRef, Suspense, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import type { Project, LinkedInPost } from "@/lib/types";
@@ -33,7 +33,8 @@ async function fetchProjectData(projectId: string): Promise<ProjectDetail | null
 
 function ProjectContent({ projectId }: { projectId: string }) {
   const router = useRouter();
-  const project = use(fetchProjectData(projectId));
+  const projectDataPromise = useMemo(() => fetchProjectData(projectId), [projectId]);
+  const project = use(projectDataPromise);
   const [posts, setPosts] = useState<LinkedInPost[]>(() => project?.posts ?? []);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(() =>
     (project?.posts?.length ?? 0) > 0 ? 0 : null
@@ -520,3 +521,4 @@ export default function ProjectDetailPage() {
     </Suspense>
   );
 }
+
