@@ -135,7 +135,7 @@ function ProjectContent({ projectId }: { projectId: string }) {
 
       const voiceProfilePrompt = localStorage.getItem("link2post_voice_prompt") || "";
 
-      const response = await fetch(`/api/projects/${projectId}/generate`, {
+      const response = await fetch(`/api/projects/${projectId}/generate-pipeline`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${session.access_token}`,
@@ -156,8 +156,6 @@ function ProjectContent({ projectId }: { projectId: string }) {
       if (!reader) throw new Error("No response stream");
 
       const decoder = new TextDecoder();
-      let accumulated = "";
-      let model = "";
 
       while (true) {
         const { done, value } = await reader.read();
@@ -173,43 +171,41 @@ function ProjectContent({ projectId }: { projectId: string }) {
 
           try {
             const parsed = JSON.parse(data);
-            if (parsed.model) {
-              model = `${parsed.provider}/${parsed.model}`;
-              setGenerateProgress(`Generating with ${model}...`);
-            }
-            if (parsed.content) {
-              accumulated += parsed.content;
-              setGenerateProgress(`Generating... (${accumulated.length} chars)`);
-            }
-          } catch { /* skip parse errors */ }
-        }
-      }
 
-      setGenerateProgress("Processing results...");
-
-      if (accumulated) {
-        let parsed: { posts?: Array<{ hook: string; body: string; imagePrompt: string; viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number }> } | null = null;
-        try { parsed = JSON.parse(accumulated); } catch {
-          const jsonStart = accumulated.indexOf("{");
-          const jsonEnd = accumulated.lastIndexOf("}");
-          if (jsonStart !== -1 && jsonEnd > jsonStart) {
-            try { parsed = JSON.parse(accumulated.slice(jsonStart, jsonEnd + 1)); } catch { /* */ }
+            if (parsed.step === "analysis" && parsed.status === "started") {
+              setGenerateProgress(parsed.message || "Analyzing transcript...");
+            } else if (parsed.step === "analysis" && parsed.status === "completed") {
+              setGenerateProgress(`Analysis done (${parsed.latencyMs}ms) — extracting ideas...`);
+            } else if (parsed.step === "posts" && parsed.status === "started") {
+              setGenerateProgress(parsed.message || "Generating posts...");
+            } else if (parsed.step === "posts" && parsed.status === "completed") {
+              if (parsed.posts) {
+                const newPosts: LinkedInPost[] = parsed.posts.map((post: { hook: string; body: string; imagePrompt: string; viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number }) => ({
+                  hook: post.hook,
+                  body: post.body,
+                  imagePrompt: post.imagePrompt,
+                  viralityScore: post.viralityScore ?? 0,
+                  authorityScore: post.authorityScore ?? 0,
+                  commentPotential: post.commentPotential ?? 0,
+                  readabilityScore: post.readabilityScore ?? 0,
+                  status: "draft" as const,
+                }));
+                setPosts(newPosts);
+                if (newPosts.length > 0) setSelectedIndex(0);
+              }
+              setGenerateProgress(`Posts ready (${parsed.latencyMs}ms) — generating articles...`);
+            } else if (parsed.step === "articles" && parsed.status === "completed") {
+              setGenerateProgress("Content generation complete!");
+            } else if (parsed.step === "error") {
+              throw new Error(parsed.error || "Generation failed");
+            }
+          } catch (e) {
+            if (e instanceof Error && e.message !== "Generation failed") {
+              /* skip parse errors */
+            } else {
+              throw e;
+            }
           }
-        }
-
-        if (parsed?.posts) {
-          const newPosts: LinkedInPost[] = parsed.posts.map((post) => ({
-            hook: post.hook,
-            body: post.body,
-            imagePrompt: post.imagePrompt,
-            viralityScore: post.viralityScore ?? 0,
-            authorityScore: post.authorityScore ?? 0,
-            commentPotential: post.commentPotential ?? 0,
-            readabilityScore: post.readabilityScore ?? 0,
-            status: "draft" as const,
-          }));
-          setPosts(newPosts);
-          if (newPosts.length > 0) setSelectedIndex(0);
         }
       }
 

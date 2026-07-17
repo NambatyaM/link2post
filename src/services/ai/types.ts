@@ -6,7 +6,10 @@ export type TaskType =
   | "carousel_generation"
   | "rewrite_edit"
   | "hook_generation"
-  | "content_calendar";
+  | "content_calendar"
+  | "transcript_analysis"
+  | "posts_generation"
+  | "articles_calendar_generation";
 
 export interface ProviderConfig {
   id: string;

@@ -2,8 +2,176 @@ import type { VideoInfo, ContentType } from "./types";
 import { POSTING_SCHEDULE } from "./types";
 
 // ============================================================================
-// INDIVIDUAL PROMPTS (PRD AI Prompt Library)
+// 3-CALL PIPELINE PROMPTS (Optimized for speed)
 // ============================================================================
+
+export const ANALYSIS_PROMPT = `You are a LinkedIn content analyst. Analyze this transcript and extract everything needed to generate a month of content.
+
+---TRANSCRIPT---
+{transcript}
+
+---INSTRUCTIONS---
+
+1. CLEAN the transcript: remove filler words, fix transcription errors, preserve the speaker's vocabulary. Return a cleaned version.
+
+2. ANALYZE the voice: vocabulary level (casual/formal), sentence rhythm (short/long), energy level (high/calm), signature patterns, jargon, common phrases.
+
+3. EXTRACT 8-12 distinct standalone moments from the transcript. Each moment is a specific claim, story, framework, mistake, number, or contrarian take. For each:
+   - title: catchy attention-grabbing title
+   - insight: core takeaway
+   - quote: specific detail from transcript
+   - viralityScore: 1-10
+   - authorityScore: 1-10
+   - commentPotential: 1-10
+
+4. RANK moments by total score (virality + authority + comments). Assign content types:
+   - Story posts: moments with personal narratives or emotional arcs
+   - Educational/Framework posts: moments that teach a system
+   - Listicle posts: moments with multiple supporting points
+   - Case Study/Data posts: moments with specific numbers
+   - Article: moments that can be expanded into longer content
+   - Carousel: moments that work as visual slides
+
+Return ONLY valid JSON:
+{
+  "cleaned_transcript": "Cleaned version of the transcript",
+  "voice_profile": {
+    "tone": ["tone1", "tone2", "tone3"],
+    "avg_sentence_length": "short | medium | long",
+    "formatting_style": ["style1", "style2"],
+    "vocabulary_traits": ["trait1", "trait2", "trait3"],
+    "common_phrases": ["phrase1", "phrase2"],
+    "favorite_emojis": ["emoji1"]
+  },
+  "ideas": [
+    {
+      "title": "Catchy title",
+      "insight": "Core takeaway",
+      "quote": "Specific detail from transcript",
+      "viralityScore": 8,
+      "authorityScore": 7,
+      "commentPotential": 6,
+      "suggestedType": "story | educational | framework | listicle | case_study"
+    }
+  ]
+}`;
+
+export const POSTS_PROMPT = `You are an expert LinkedIn post writer. Generate posts from the analyzed ideas below.
+
+---VOICE PROFILE---
+{voice_profile}
+
+---RANKED IDEAS (top {post_count} selected)---
+{ideas}
+
+---POSTING SCHEDULE---
+{schedule}
+
+---RULES (follow exactly)---
+1. Generate exactly {post_count} posts, each from a DIFFERENT idea.
+2. Each post type must match its suggestedType from the ideas.
+3. Hook: under 10 words. Data point, contrarian statement, or sharp question. No generic openers.
+4. Body: 1-2 sentence paragraphs. Short. Punchy. Include ONE specific detail from the idea.
+5. Closing: end on the point or a genuine specific question. No generic "Thoughts?"
+6. Length: 1,000-1,300 characters total per post.
+7. No hashtags. No external links. No engagement bait.
+8. No emojis unless voice profile includes them.
+9. First person voice. Never reference "the video" or "the podcast".
+10. One specific image prompt per post (visual subject, lighting, camera angle, mood, --ar 16:9).
+
+Return ONLY valid JSON:
+{
+  "posts": [
+    {
+      "hook": "Line 1-2 that stops the scroll",
+      "body": "Full post body. 1,000-1,300 characters. Short paragraphs.",
+      "imagePrompt": "Specific visual prompt. No text in image. --ar 16:9",
+      "postType": "story | educational | framework | listicle | case_study",
+      "viralityScore": 8,
+      "authorityScore": 7,
+      "commentPotential": 6,
+      "readabilityScore": 9
+    }
+  ]
+}`;
+
+export const ARTICLES_CALENDAR_PROMPT = `You are a LinkedIn content strategist. Generate articles, carousel scripts, and a 30-day content calendar using the posts already created.
+
+---VOICE PROFILE---
+{voice_profile}
+
+---EXISTING POSTS---
+{posts}
+
+---ARTICLE IDEAS (top {article_count})---
+{article_ideas}
+
+---POSTING SCHEDULE---
+{schedule}
+
+---UPCOMING DATES (next 30 days, weekdays only)---
+{dates}
+
+---ARTICLE RULES (generate {article_count} articles)---
+1. Each article weaves 2-3 related post ideas into one throughline.
+2. Title: specific and outcome-oriented.
+3. Opening hook: same standard as posts.
+4. 3-5 sections with subheadings. Bold the key sentence in each.
+5. Use comparison tables where comparing two approaches.
+6. Insert [IMAGE PROMPT 1], [IMAGE PROMPT 2], [IMAGE PROMPT 3] at natural section breaks.
+7. 800-1,500 words. 3 image prompts total per article.
+8. Closing: concrete takeaway, not generic summary.
+
+---CAROUSEL RULES (generate 1 carousel script from top ideas)---
+1. 6-8 slides. Better 7 great slides than 10 weak ones.
+2. Slide 1 (Hook): bold title that stops the scroll. Number, contrarian claim, or sharp question.
+3. Middle slides: one key takeaway per slide. Title max 8 words. Body max 30 words.
+4. Last slide (CTA): save, follow, share, or comment.
+5. Every slide must have a SPECIFIC detail from the transcript.
+
+---CALENDAR RULES (30-day calendar)---
+- Monday: Broad Appeal / Motivation / Story
+- Tuesday: Educational / Framework
+- Wednesday: Case Study / Data / Contrarian
+- Thursday: Listicle / Resource
+- Friday: Personal / Reflection
+- Saturday/Sunday: Rest (no posting)
+- Max 5 posts/week, min 3. Wednesday gets the strongest piece.
+- Never schedule two pieces less than 24 hours apart.
+- Rotate content types. Prioritize variety.
+
+Return ONLY valid JSON:
+{
+  "articles": [
+    {
+      "title": "Specific, outcome-oriented title",
+      "body": "Full article with subheadings, [IMAGE PROMPT N] markers, 800-1,500 words.",
+      "imagePrompts": ["Prompt 1 --ar 16:9", "Prompt 2 --ar 16:9", "Prompt 3 --ar 16:9"]
+    }
+  ],
+  "carousel": {
+    "title": "Carousel title",
+    "slides": [
+      {
+        "slideNumber": 1,
+        "title": "Hook title (max 8 words)",
+        "body": "Supporting text (max 30 words)",
+        "notes": "Design suggestion"
+      }
+    ]
+  },
+  "calendar": [
+    {
+      "day": "Monday",
+      "date": "YYYY-MM-DD",
+      "type": "post | article | carousel",
+      "title": "Title of the piece",
+      "contentIndex": 0,
+      "recommendedTime": "10:00-11:00 AM",
+      "note": "Why this day and time"
+    }
+  ]
+}`;
 
 export const VOICE_ANALYSIS_PROMPT = `You are an expert voice and tone analyst for LinkedIn content creation.
 
@@ -736,4 +904,69 @@ QUALITY CHECKLIST:
 - Match the creator's voice exactly
 
 Return the complete JSON now.`;
+}
+
+// ============================================================================
+// 3-CALL PIPELINE BUILDERS
+// ============================================================================
+
+export function buildAnalysisPrompt(videoInfo: VideoInfo): string {
+  return ANALYSIS_PROMPT.replace("{transcript}", videoInfo.transcript.slice(0, 15000));
+}
+
+export function buildPostsPrompt(
+  voiceProfile: Record<string, unknown>,
+  ideas: Array<{ title: string; insight: string; quote: string; viralityScore: number; authorityScore: number; commentPotential: number; suggestedType: string }>,
+  postCount: number = 5,
+): string {
+  const topIdeas = ideas
+    .sort((a, b) => (b.viralityScore + b.authorityScore + b.commentPotential) - (a.viralityScore + a.authorityScore + a.commentPotential))
+    .slice(0, postCount);
+
+  const scheduleStr = POSTING_SCHEDULE.map(
+    (s) => `${s.day}: ${s.window} — Best for: ${s.bestFor}`,
+  ).join("\n");
+
+  return POSTS_PROMPT
+    .replace("{voice_profile}", JSON.stringify(voiceProfile, null, 2))
+    .replace("{ideas}", JSON.stringify(topIdeas, null, 2))
+    .replace(/{post_count}/g, String(postCount))
+    .replace("{schedule}", scheduleStr);
+}
+
+export function buildArticlesCalendarPrompt(
+  voiceProfile: Record<string, unknown>,
+  posts: Array<{ hook: string; body: string; postType: string; viralityScore: number }>,
+  ideas: Array<{ title: string; insight: string; quote: string; viralityScore: number; authorityScore: number; commentPotential: number; suggestedType: string }>,
+  articleCount: number = 2,
+): string {
+  const today = new Date();
+  const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const upcoming: string[] = [];
+  for (let i = 0; i < 30; i++) {
+    const d = new Date(today);
+    d.setDate(today.getDate() + i);
+    const dayName = days[d.getDay()];
+    if (!["Saturday", "Sunday"].includes(dayName)) {
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      upcoming.push(`${dayName} ${d.getFullYear()}-${month}-${day}`);
+    }
+  }
+
+  const scheduleStr = POSTING_SCHEDULE.map(
+    (s) => `${s.day}: ${s.window} — Best for: ${s.bestFor}`,
+  ).join("\n");
+
+  const articleIdeas = ideas
+    .sort((a, b) => (b.viralityScore + b.authorityScore) - (a.viralityScore + a.authorityScore))
+    .slice(0, articleCount + 2);
+
+  return ARTICLES_CALENDAR_PROMPT
+    .replace("{voice_profile}", JSON.stringify(voiceProfile, null, 2))
+    .replace("{posts}", JSON.stringify(posts.map((p, i) => ({ index: i, ...p })), null, 2))
+    .replace(/{article_count}/g, String(articleCount))
+    .replace("{article_ideas}", JSON.stringify(articleIdeas, null, 2))
+    .replace("{schedule}", scheduleStr)
+    .replace("{dates}", upcoming.join(", "));
 }

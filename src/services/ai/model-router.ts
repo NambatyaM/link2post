@@ -140,6 +140,39 @@ function buildRouteTable(): Record<TaskType, RouteEntry[]> {
         ? [{ provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") }]
         : []),
     ],
+    transcript_analysis: [
+      ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
+        ? [{ provider: "gemini", model: "gemini-2.0-flash", call: geminiCall }]
+        : []),
+      ...(checkApiKey("GROQ_API_KEY")
+        ? [{ provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") }]
+        : []),
+      ...(checkApiKey("OPENROUTER_API_KEY")
+        ? [{ provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") }]
+        : []),
+    ],
+    posts_generation: [
+      ...(checkApiKey("GROQ_API_KEY")
+        ? [{ provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") }]
+        : []),
+      ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
+        ? [{ provider: "gemini", model: "gemini-2.0-flash", call: geminiCall }]
+        : []),
+      ...(checkApiKey("MISTRAL_API_KEY")
+        ? [{ provider: "mistral", model: "mistral-small-latest", call: mistralCall }]
+        : []),
+    ],
+    articles_calendar_generation: [
+      ...(checkApiKey("GROQ_API_KEY")
+        ? [{ provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") }]
+        : []),
+      ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
+        ? [{ provider: "gemini", model: "gemini-2.0-flash", call: geminiCall }]
+        : []),
+      ...(checkApiKey("OPENROUTER_API_KEY")
+        ? [{ provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") }]
+        : []),
+    ],
   };
 }
 
@@ -148,6 +181,9 @@ function shouldExpectJson(taskType: TaskType): boolean {
     case "transcript_processing":
     case "brand_voice_learning":
     case "content_calendar":
+    case "transcript_analysis":
+    case "posts_generation":
+    case "articles_calendar_generation":
       return true;
     case "post_generation":
     case "article_generation":
@@ -164,7 +200,12 @@ function shouldExpectJson(taskType: TaskType): boolean {
 function getMaxTokens(taskType: TaskType): number {
   switch (taskType) {
     case "content_calendar":
-      return 12000;
+    case "articles_calendar_generation":
+      return 10000;
+    case "transcript_analysis":
+      return 6000;
+    case "posts_generation":
+      return 6000;
     case "article_generation":
       return 8000;
     case "carousel_generation":
