@@ -255,6 +255,7 @@ export async function routeTask(
 
   const groqRoutes = routes.filter((r) => r.provider === "groq");
   const fastFallback = groqRoutes.length > 0 ? groqRoutes[0] : null;
+  const raceAbort = new AbortController();
 
   function validateResult(result: { content: string; latencyMs: number }, route: RouteEntry): RouteResult | null {
     if (!result.content || result.content.trim().length === 0) {
@@ -277,7 +278,7 @@ export async function routeTask(
   async function tryRoute(route: RouteEntry): Promise<RouteResult | null> {
     try {
       console.log(`[model-router] Trying ${route.provider}/${route.model} for ${taskType}`);
-      const result = await route.call(request);
+      const result = await route.call({ ...request, signal: raceAbort.signal });
       return validateResult(result, route);
     } catch (err) {
       const statusCode = err && typeof err === "object" && "statusCode" in err
@@ -289,6 +290,7 @@ export async function routeTask(
   }
 
   const firstRoute = routes[0];
+  const requestWithSignal = { ...request, signal: raceAbort.signal };
   const firstResultPromise = tryRoute(firstRoute);
 
   if (fastFallback && fastFallback !== firstRoute) {
@@ -297,11 +299,13 @@ export async function routeTask(
       new Promise<{ route: RouteEntry; result: null }>((resolve) =>
         setTimeout(() => resolve({ route: fastFallback, result: null }), FAST_RACE_MS)
       ),
-      fastFallback.call(request).then((r) => {
+      fastFallback.call(requestWithSignal).then((r) => {
         const validated = validateResult(r, fastFallback);
         return { route: fastFallback, result: validated };
       }).catch(() => ({ route: fastFallback, result: null })),
     ]);
+
+    raceAbort.abort();
 
     if (raceResult.result) {
       console.log(`[model-router] Race winner: ${raceResult.route.provider}/${raceResult.route.model}`);

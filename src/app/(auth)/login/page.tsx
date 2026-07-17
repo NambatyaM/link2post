@@ -71,10 +71,12 @@ export default function LoginPage() {
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-3">
+          <label className="sr-only" htmlFor="login-email">Email address</label>
           <input
+            id="login-email"
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => { setEmail(e.target.value); if (error) setError(""); }}
             placeholder="Email address"
             required
             autoComplete="email"
@@ -85,10 +87,12 @@ export default function LoginPage() {
               border: "1px solid var(--border)",
             }}
           />
+          <label className="sr-only" htmlFor="login-password">Password</label>
           <input
+            id="login-password"
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => { setPassword(e.target.value); if (error) setError(""); }}
             placeholder="Password"
             required
             autoComplete="current-password"

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useCallback, useRef, Suspense, useMemo } from "react";
+import { use, useState, useCallback, useRef, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import type { Project, LinkedInPost } from "@/lib/types";
@@ -11,30 +11,47 @@ interface ProjectDetail extends Project {
   posts: LinkedInPost[];
 }
 
+const projectDataCache = new Map<string, Promise<ProjectDetail | null>>();
+
+function getProjectDataCached(projectId: string): Promise<ProjectDetail | null> {
+  const cached = projectDataCache.get(projectId);
+  if (cached) return cached;
+  const promise = fetchProjectData(projectId);
+  projectDataCache.set(projectId, promise);
+  return promise;
+}
+
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("Request timed out")), ms);
+    promise.then(resolve, reject).finally(() => clearTimeout(timer));
+  });
+}
+
 async function fetchProjectData(projectId: string): Promise<ProjectDetail | null> {
   try {
     const supabase = getSupabaseBrowser();
-    const { data: { session } } = await supabase.auth.getSession();
+    const { data: { session } } = await withTimeout(supabase.auth.getSession(), 15_000);
 
     if (!session) return null;
 
-    const res = await fetch(`/api/projects/${projectId}`, {
+    const res = await withTimeout(fetch(`/api/projects/${projectId}`, {
       headers: { Authorization: `Bearer ${session.access_token}` },
-    });
+    }), 15_000);
 
     if (!res.ok) throw new Error("Failed to fetch");
 
     const data = await res.json();
     return { ...data.project, posts: data.posts || [] } as ProjectDetail;
   } catch {
+    projectDataCache.delete(projectId);
     return null;
   }
 }
 
 function ProjectContent({ projectId }: { projectId: string }) {
   const router = useRouter();
-  const projectDataPromise = useMemo(() => fetchProjectData(projectId), [projectId]);
-  const project = use(projectDataPromise);
+  const project = use(getProjectDataCached(projectId));
   const [posts, setPosts] = useState<LinkedInPost[]>(() => project?.posts ?? []);
   const [selectedIndex, setSelectedIndex] = useState<number | null>(() =>
     (project?.posts?.length ?? 0) > 0 ? 0 : null
@@ -514,6 +531,17 @@ function LoadingSkeleton() {
 export default function ProjectDetailPage() {
   const params = useParams();
   const projectId = params.id as string;
+
+  if (!projectId) {
+    return (
+      <main className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-primary)" }}>
+        <div className="text-center">
+          <p className="text-sm mb-4" style={{ color: "var(--error)" }}>Invalid project ID</p>
+          <a href="/projects" className="text-xs font-medium px-4 py-2 rounded-lg inline-block" style={{ background: "var(--accent)", color: "white" }}>Back to Projects</a>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <Suspense fallback={<LoadingSkeleton />}>

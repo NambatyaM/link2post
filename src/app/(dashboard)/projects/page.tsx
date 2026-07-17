@@ -166,7 +166,7 @@ export default function ProjectsPage() {
                     {project.title}
                   </p>
                   <p className="text-xs truncate mt-0.5" style={{ color: "var(--text-muted)" }}>
-                    {project.rawTranscript.slice(0, 80)}...
+                    {project.rawTranscript?.slice(0, 80) || "No transcript"}...
                   </p>
                 </div>
                 <span

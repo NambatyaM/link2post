@@ -47,8 +47,9 @@ export async function callProvider(
     });
 
     if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
       throw new GeminiProviderError(
-        `Gemini API error: ${response.status} ${response.statusText}`,
+        `Gemini API error: ${response.status} ${response.statusText}${errBody ? " - " + errBody.slice(0, 200) : ""}`,
         response.status,
       );
     }

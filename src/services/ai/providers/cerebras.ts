@@ -1,7 +1,7 @@
 import { getApiKey } from "../utils";
 import type { CompletionRequest, ProviderError } from "../types";
 
-const TIMEOUT_MS = 15_000;
+const TIMEOUT_MS = 25_000;
 
 export class CerebrasProviderError extends Error implements ProviderError {
   provider = "cerebras";
@@ -26,6 +26,8 @@ export async function callProvider(
   const start = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const onAbort = () => { clearTimeout(timer); controller.abort(); };
+  request.signal?.addEventListener("abort", onAbort, { once: true });
 
   try {
     const response = await fetch(url, {
@@ -47,8 +49,9 @@ export async function callProvider(
     });
 
     if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
       throw new CerebrasProviderError(
-        `Cerebras API error: ${response.status} ${response.statusText}`,
+        `Cerebras API error: ${response.status} ${response.statusText}${errBody ? " - " + errBody.slice(0, 200) : ""}`,
         response.status,
       );
     }
@@ -70,5 +73,6 @@ export async function callProvider(
     );
   } finally {
     clearTimeout(timer);
+    request.signal?.removeEventListener("abort", onAbort);
   }
 }

@@ -43,6 +43,14 @@ export const generateContentTask = task({
       throw new Error("Project already completed");
     }
 
+    const { count: existingPostCount } = await supabase
+      .from("posts").select("id", { count: "exact", head: true })
+      .eq("project_id", projectId).eq("user_id", userId);
+
+    if ((existingPostCount ?? 0) > 0) {
+      await supabase.from("posts").delete().eq("project_id", projectId).eq("user_id", userId);
+    }
+
     const videoInfo: VideoInfo = {
       title: project.title,
       description: "",

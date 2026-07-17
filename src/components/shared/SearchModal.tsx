@@ -33,7 +33,9 @@ export default function SearchModal({ open, onClose }: SearchModalProps) {
       setQuery("");
       setResults([]);
       setActiveIndex(0);
-      setTimeout(() => inputRef.current?.focus(), 50);
+      const t = setTimeout(() => inputRef.current?.focus(), 50);
+      prevOpenRef.current = open;
+      return () => { clearTimeout(t); };
     }
     prevOpenRef.current = open;
   }, [open]);

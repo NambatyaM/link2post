@@ -47,115 +47,119 @@ export default function ExportToolbar({ project, posts }: ExportToolbarProps) {
       const result = { posts, articles: [], calendar: [] };
       const title = project.title.replace(/[^a-zA-Z0-9-_ ]/g, "").trim() || "export";
 
-      switch (format) {
-        case "txt":
-          downloadFile(exportToTxt(result), `${title}.txt`, "text/plain");
-          break;
-        case "md":
-          downloadFile(exportToMarkdown(result), `${title}.md`, "text/markdown");
-          break;
-        case "csv":
-          downloadFile(exportToCsv(result), `${title}.csv`, "text/csv");
-          break;
-        case "pdf": {
-          const { default: jsPDF } = await import("jspdf");
-          const doc = new jsPDF();
-          doc.setFontSize(18);
-          doc.text(title, 20, 20);
-          let y = 35;
-          posts.forEach((post, i) => {
-            if (y > 260) { doc.addPage(); y = 20; }
-            doc.setFontSize(12);
-            doc.setFont("helvetica", "bold");
-            doc.text(`Post ${i + 1}`, 20, y);
-            y += 7;
-            doc.setFont("helvetica", "normal");
-            doc.setFontSize(10);
-            if (post.hook) {
-              const hookLines = doc.splitTextToSize(`Hook: ${post.hook}`, 170);
-              doc.text(hookLines, 20, y);
-              y += hookLines.length * 5 + 2;
-            }
-            const bodyLines = doc.splitTextToSize(post.body, 170);
-            bodyLines.forEach((line: string) => {
-              if (y > 275) { doc.addPage(); y = 20; }
-              doc.text(line, 20, y);
-              y += 5;
+      try {
+        switch (format) {
+          case "txt":
+            downloadFile(exportToTxt(result), `${title}.txt`, "text/plain");
+            break;
+          case "md":
+            downloadFile(exportToMarkdown(result), `${title}.md`, "text/markdown");
+            break;
+          case "csv":
+            downloadFile(exportToCsv(result), `${title}.csv`, "text/csv");
+            break;
+          case "pdf": {
+            const { default: jsPDF } = await import("jspdf");
+            const doc = new jsPDF();
+            doc.setFontSize(18);
+            doc.text(title, 20, 20);
+            let y = 35;
+            posts.forEach((post, i) => {
+              if (y > 260) { doc.addPage(); y = 20; }
+              doc.setFontSize(12);
+              doc.setFont("helvetica", "bold");
+              doc.text(`Post ${i + 1}`, 20, y);
+              y += 7;
+              doc.setFont("helvetica", "normal");
+              doc.setFontSize(10);
+              if (post.hook) {
+                const hookLines = doc.splitTextToSize(`Hook: ${post.hook}`, 170);
+                doc.text(hookLines, 20, y);
+                y += hookLines.length * 5 + 2;
+              }
+              const bodyLines = doc.splitTextToSize(post.body, 170);
+              bodyLines.forEach((line: string) => {
+                if (y > 275) { doc.addPage(); y = 20; }
+                doc.text(line, 20, y);
+                y += 5;
+              });
+              y += 8;
             });
-            y += 8;
-          });
-          doc.save(`${title}.pdf`);
-          break;
+            doc.save(`${title}.pdf`);
+            break;
+          }
+          case "docx": {
+            const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx");
+            const children = posts.flatMap((post, i) => [
+              new Paragraph({
+                children: [new TextRun({ text: `Post ${i + 1}`, bold: true, size: 28 })],
+                spacing: { after: 200 },
+              }),
+              ...(post.hook
+                ? [new Paragraph({
+                    children: [new TextRun({ text: `Hook: ${post.hook}`, bold: true, size: 22 })],
+                    spacing: { after: 100 },
+                  })]
+                : []),
+              new Paragraph({
+                children: [new TextRun({ text: post.body, size: 22 })],
+                spacing: { after: 300 },
+              }),
+            ]);
+            const doc = new Document({
+              sections: [{ children }],
+            });
+            const blob = await Packer.toBlob(doc);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${title}.docx`;
+            a.click();
+            URL.revokeObjectURL(url);
+            break;
+          }
+          case "xlsx": {
+            const ExcelJS = await import("exceljs");
+            const wb = new ExcelJS.default.Workbook();
+            const ws = wb.addWorksheet("Posts");
+            ws.columns = [
+              { header: "#", key: "num", width: 5 },
+              { header: "Hook", key: "hook", width: 40 },
+              { header: "Body", key: "body", width: 60 },
+              { header: "Virality", key: "virality", width: 10 },
+              { header: "Image Prompt", key: "imagePrompt", width: 40 },
+            ];
+            posts.forEach((post, i) => {
+              ws.addRow({ num: i + 1, hook: post.hook, body: post.body, virality: post.viralityScore ?? "", imagePrompt: post.imagePrompt });
+            });
+            const buf = await wb.xlsx.writeBuffer();
+            const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${title}.xlsx`;
+            a.click();
+            URL.revokeObjectURL(url);
+            break;
+          }
+          case "zip": {
+            const JSZip = (await import("jszip")).default;
+            const zip = new JSZip();
+            zip.file("posts.txt", exportToTxt(result));
+            zip.file("posts.md", exportToMarkdown(result));
+            zip.file("posts.csv", exportToCsv(result));
+            const blob = await zip.generateAsync({ type: "blob" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `${title}.zip`;
+            a.click();
+            URL.revokeObjectURL(url);
+            break;
+          }
         }
-        case "docx": {
-          const { Document, Packer, Paragraph, TextRun, HeadingLevel } = await import("docx");
-          const children = posts.flatMap((post, i) => [
-            new Paragraph({
-              children: [new TextRun({ text: `Post ${i + 1}`, bold: true, size: 28 })],
-              spacing: { after: 200 },
-            }),
-            ...(post.hook
-              ? [new Paragraph({
-                  children: [new TextRun({ text: `Hook: ${post.hook}`, bold: true, size: 22 })],
-                  spacing: { after: 100 },
-                })]
-              : []),
-            new Paragraph({
-              children: [new TextRun({ text: post.body, size: 22 })],
-              spacing: { after: 300 },
-            }),
-          ]);
-          const doc = new Document({
-            sections: [{ children }],
-          });
-          const blob = await Packer.toBlob(doc);
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `${title}.docx`;
-          a.click();
-          URL.revokeObjectURL(url);
-          break;
-        }
-        case "xlsx": {
-          const ExcelJS = await import("exceljs");
-          const wb = new ExcelJS.default.Workbook();
-          const ws = wb.addWorksheet("Posts");
-          ws.columns = [
-            { header: "#", key: "num", width: 5 },
-            { header: "Hook", key: "hook", width: 40 },
-            { header: "Body", key: "body", width: 60 },
-            { header: "Virality", key: "virality", width: 10 },
-            { header: "Image Prompt", key: "imagePrompt", width: 40 },
-          ];
-          posts.forEach((post, i) => {
-            ws.addRow({ num: i + 1, hook: post.hook, body: post.body, virality: post.viralityScore ?? "", imagePrompt: post.imagePrompt });
-          });
-          const buf = await wb.xlsx.writeBuffer();
-          const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `${title}.xlsx`;
-          a.click();
-          URL.revokeObjectURL(url);
-          break;
-        }
-        case "zip": {
-          const JSZip = (await import("jszip")).default;
-          const zip = new JSZip();
-          zip.file("posts.txt", exportToTxt(result));
-          zip.file("posts.md", exportToMarkdown(result));
-          zip.file("posts.csv", exportToCsv(result));
-          const blob = await zip.generateAsync({ type: "blob" });
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = url;
-          a.download = `${title}.zip`;
-          a.click();
-          URL.revokeObjectURL(url);
-          break;
-        }
+      } catch {
+        console.warn("Export failed for format:", format);
       }
     },
     [project.title, posts]

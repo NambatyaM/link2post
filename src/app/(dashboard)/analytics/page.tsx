@@ -116,10 +116,9 @@ export default function AnalyticsPage() {
   const avgAuthority = totalPosts > 0 ? Math.round(allPosts.reduce((s, p) => s + p.authorityScore, 0) / totalPosts) : 0;
   const avgReadability = totalPosts > 0 ? Math.round(allPosts.reduce((s, p) => s + p.readabilityScore, 0) / totalPosts) : 0;
 
-  const statusCount: Record<string, number> = { draft: 0, ready: 0, approved: 0, scheduled: 0, published: 0 };
+  const statusCount: Record<string, number> = {};
   for (const post of allPosts) {
-    if (statusCount[post.status] !== undefined) statusCount[post.status]++;
-    else statusCount.ready++;
+    statusCount[post.status] = (statusCount[post.status] ?? 0) + 1;
   }
 
   const topPost = allPosts.length > 0 ? allPosts.reduce((best, p) => p.viralityScore > best.viralityScore ? p : best) : null;
@@ -261,10 +260,10 @@ export default function AnalyticsPage() {
                   <h3 className="text-sm font-semibold mb-4" style={{ color: "var(--text-primary)" }}>Content Library</h3>
                   <div className="grid grid-cols-2 gap-3">
                     {[
-                      { label: "Draft", count: statusCount.draft, color: "var(--text-muted)" },
-                      { label: "Approved", count: statusCount.approved + statusCount.ready, color: "#34D399" },
-                      { label: "Scheduled", count: statusCount.scheduled, color: "#60A5FA" },
-                      { label: "Published", count: statusCount.published, color: "var(--accent)" },
+                      { label: "Draft", count: statusCount.draft ?? 0, color: "var(--text-muted)" },
+                      { label: "Approved", count: (statusCount.approved ?? 0) + (statusCount.ready ?? 0), color: "#34D399" },
+                      { label: "Scheduled", count: statusCount.scheduled ?? 0, color: "#60A5FA" },
+                      { label: "Published", count: statusCount.published ?? 0, color: "var(--accent)" },
                     ].map((s) => (
                       <div key={s.label} className="rounded-lg p-3" style={{ background: "var(--bg-tertiary)" }}>
                         <span className="text-2xl font-bold block" style={{ color: s.color }}>{s.count}</span>

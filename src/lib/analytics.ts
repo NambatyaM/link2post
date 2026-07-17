@@ -88,27 +88,34 @@ export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
   const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
   const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
 
+  async function safeCount(q: any): Promise<{ count: number; data: any[] }> {
+    try { const r = await q; return { count: r.count ?? 0, data: r.data ?? [] }; } catch { return { count: 0, data: [] }; }
+  }
+  async function safeData(q: any): Promise<{ data: any[] }> {
+    try { const r = await q; return { data: r.data ?? [] }; } catch { return { data: [] }; }
+  }
+
   const [signupsTotal, signupsToday, signupsWeek, signupsBySource] = await Promise.all([
-    supabase.from("signup_events").select("*", { count: "exact", head: true }),
-    supabase.from("signup_events").select("*", { count: "exact", head: true }).gte("created_at", todayStart),
-    supabase.from("signup_events").select("*", { count: "exact", head: true }).gte("created_at", weekStart),
-    supabase.from("signup_events").select("source"),
+    safeCount(supabase.from("signup_events").select("*", { count: "exact", head: true })),
+    safeCount(supabase.from("signup_events").select("*", { count: "exact", head: true }).gte("created_at", todayStart)),
+    safeCount(supabase.from("signup_events").select("*", { count: "exact", head: true }).gte("created_at", weekStart)),
+    safeData(supabase.from("signup_events").select("source")),
   ]);
 
   const [gensTotal, gensToday, gensWeek, gensByType, gensFailed] = await Promise.all([
-    supabase.from("generation_analytics").select("*", { count: "exact", head: true }),
-    supabase.from("generation_analytics").select("*", { count: "exact", head: true }).gte("created_at", todayStart),
-    supabase.from("generation_analytics").select("*", { count: "exact", head: true }).gte("created_at", weekStart),
-    supabase.from("generation_analytics").select("generation_type"),
-    supabase.from("generation_analytics").select("*", { count: "exact", head: true }).eq("success", false),
+    safeCount(supabase.from("generation_analytics").select("*", { count: "exact", head: true })),
+    safeCount(supabase.from("generation_analytics").select("*", { count: "exact", head: true }).gte("created_at", todayStart)),
+    safeCount(supabase.from("generation_analytics").select("*", { count: "exact", head: true }).gte("created_at", weekStart)),
+    safeData(supabase.from("generation_analytics").select("generation_type")),
+    safeCount(supabase.from("generation_analytics").select("*", { count: "exact", head: true }).eq("success", false)),
   ]);
 
   const [visitsTotal, visitsToday, visitsWeek, returnVisits, uniqueDevices] = await Promise.all([
-    supabase.from("visit_events").select("*", { count: "exact", head: true }),
-    supabase.from("visit_events").select("*", { count: "exact", head: true }).gte("created_at", todayStart),
-    supabase.from("visit_events").select("*", { count: "exact", head: true }).gte("created_at", weekStart),
-    supabase.from("visit_events").select("*", { count: "exact", head: true }).eq("is_return", true),
-    supabase.from("visit_events").select("device_id").not("device_id", "is", null),
+    safeCount(supabase.from("visit_events").select("*", { count: "exact", head: true })),
+    safeCount(supabase.from("visit_events").select("*", { count: "exact", head: true }).gte("created_at", todayStart)),
+    safeCount(supabase.from("visit_events").select("*", { count: "exact", head: true }).gte("created_at", weekStart)),
+    safeCount(supabase.from("visit_events").select("*", { count: "exact", head: true }).eq("is_return", true)),
+    safeData(supabase.from("visit_events").select("device_id").not("device_id", "is", null)),
   ]);
 
   const sourceCounts: Record<string, number> = {};

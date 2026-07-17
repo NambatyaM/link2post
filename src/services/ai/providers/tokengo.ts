@@ -41,6 +41,8 @@ async function callWithModel(
   const start = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const onAbort = () => { clearTimeout(timer); controller.abort(); };
+  request.signal?.addEventListener("abort", onAbort, { once: true });
 
   try {
     const response = await fetch(BASE_URL, {
@@ -62,8 +64,9 @@ async function callWithModel(
     });
 
     if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
       throw new TokenGoProviderError(
-        `TokenGo API error: ${response.status} ${response.statusText}`,
+        `TokenGo API error: ${response.status} ${response.statusText}${errBody ? " - " + errBody.slice(0, 200) : ""}`,
         response.status,
       );
     }
@@ -85,5 +88,6 @@ async function callWithModel(
     );
   } finally {
     clearTimeout(timer);
+    request.signal?.removeEventListener("abort", onAbort);
   }
 }

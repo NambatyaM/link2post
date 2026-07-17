@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useCallback } from "react";
+import { useEffect, use, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import type { CarouselSlide } from "@/lib/types";
@@ -105,9 +105,9 @@ function EditorPageContent({ projectId }: { projectId: string }) {
   }, [projectId]);
 
   // Auto-load on mount
-  useState(() => {
+  useEffect(() => {
     loadAndGenerate();
-  });
+  }, [loadAndGenerate]);
 
   if (loading || generating) {
     return (
@@ -205,6 +205,14 @@ function EditorPageContent({ projectId }: { projectId: string }) {
 export default function CarouselEditorPage() {
   const params = useParams();
   const projectId = params.id as string;
+
+  if (!projectId) {
+    return (
+      <div className="h-screen flex items-center justify-center" style={{ background: "var(--bg-primary)" }}>
+        <p className="text-sm" style={{ color: "var(--error)" }}>Invalid project ID</p>
+      </div>
+    );
+  }
 
   return <EditorPageContent projectId={projectId} />;
 }

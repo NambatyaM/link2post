@@ -43,4 +43,5 @@ export interface CompletionRequest {
   temperature?: number;
   maxTokens?: number;
   expectJson?: boolean;
+  signal?: AbortSignal;
 }

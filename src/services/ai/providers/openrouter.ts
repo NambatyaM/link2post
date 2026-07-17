@@ -26,6 +26,8 @@ export async function callProvider(
   const start = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const onAbort = () => { clearTimeout(timer); controller.abort(); };
+  request.signal?.addEventListener("abort", onAbort, { once: true });
 
   try {
     const response = await fetch(url, {
@@ -49,8 +51,9 @@ export async function callProvider(
     });
 
     if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
       throw new OpenRouterProviderError(
-        `OpenRouter API error: ${response.status} ${response.statusText}`,
+        `OpenRouter API error: ${response.status} ${response.statusText}${errBody ? " - " + errBody.slice(0, 200) : ""}`,
         response.status,
       );
     }
@@ -72,6 +75,7 @@ export async function callProvider(
     );
   } finally {
     clearTimeout(timer);
+    request.signal?.removeEventListener("abort", onAbort);
   }
 }
 
@@ -85,6 +89,8 @@ export async function callProviderWithModel(
   const start = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const onAbort = () => { clearTimeout(timer); controller.abort(); };
+  request.signal?.addEventListener("abort", onAbort, { once: true });
 
   try {
     const response = await fetch(url, {
@@ -108,8 +114,9 @@ export async function callProviderWithModel(
     });
 
     if (!response.ok) {
+      const errBody = await response.text().catch(() => "");
       throw new OpenRouterProviderError(
-        `OpenRouter API error: ${response.status} ${response.statusText}`,
+        `OpenRouter API error: ${response.status} ${response.statusText}${errBody ? " - " + errBody.slice(0, 200) : ""}`,
         response.status,
       );
     }
@@ -131,5 +138,6 @@ export async function callProviderWithModel(
     );
   } finally {
     clearTimeout(timer);
+    request.signal?.removeEventListener("abort", onAbort);
   }
 }

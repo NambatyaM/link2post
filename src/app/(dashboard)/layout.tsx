@@ -57,8 +57,10 @@ export default function DashboardLayout({
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     const supabase = getSupabaseBrowser();
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (cancelled) return;
       if (!session) {
         router.replace("/login");
         return;
@@ -77,7 +79,10 @@ export default function DashboardLayout({
       setUserEmail(session.user.email ?? undefined);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      cancelled = true;
+      subscription.unsubscribe();
+    };
   }, [router]);
 
   useEffect(() => {

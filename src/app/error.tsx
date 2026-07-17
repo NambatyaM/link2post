@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 export default function Error({
   error,
   reset,
@@ -43,13 +45,22 @@ export default function Error({
         >
           {error.message || "An unexpected error occurred."}
         </p>
-        <button
-          onClick={reset}
-          className="text-sm font-medium px-4 py-2 rounded-xl transition-colors"
-          style={{ background: "var(--accent)", color: "white" }}
-        >
-          Try again
-        </button>
+        <div className="flex items-center justify-center gap-3">
+          <button
+            onClick={reset}
+            className="text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+            style={{ background: "var(--accent)", color: "white" }}
+          >
+            Try again
+          </button>
+          <Link
+            href="/dashboard"
+            className="text-sm font-medium px-4 py-2 rounded-xl transition-colors"
+            style={{ border: "1px solid var(--border)", color: "var(--text-muted)" }}
+          >
+            Go to Dashboard
+          </Link>
+        </div>
       </div>
     </div>
   );

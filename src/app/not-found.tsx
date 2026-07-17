@@ -28,11 +28,11 @@ export default function NotFound() {
           The page you&apos;re looking for doesn&apos;t exist.
         </p>
         <Link
-          href="/"
+          href="/dashboard"
           className="inline-block text-sm font-medium px-4 py-2 rounded-xl transition-colors"
           style={{ background: "var(--accent)", color: "white" }}
         >
-          Go home
+          Go to Dashboard
         </Link>
       </div>
     </div>
