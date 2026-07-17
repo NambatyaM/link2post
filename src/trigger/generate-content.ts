@@ -20,7 +20,7 @@ async function updateProgress(step: string, progress: number, message: string) {
 
 export const generateContentTask = task({
   id: "generate-content",
-  maxDuration: 300,
+  maxDuration: 120,
   run: async (payload: GenerateContentPayload, { ctx: _ctx }) => {
     const { projectId, userId, niche: _niche, audience, voiceProfilePrompt } = payload;
     const supabase = getSupabaseServer();
@@ -81,7 +81,7 @@ export const generateContentTask = task({
               { role: "user", content: userPrompt },
             ],
             temperature: 0.7,
-            max_tokens: 16000,
+            max_tokens: 8000,
           }),
         });
 

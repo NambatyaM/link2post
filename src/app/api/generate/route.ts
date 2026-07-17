@@ -50,7 +50,7 @@ async function streamCompletion(
       if (!apiKey) continue;
 
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 30000);
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
             const response = await fetch(baseUrl, {
               signal: controller.signal,
               method: "POST",
@@ -62,7 +62,7 @@ async function streamCompletion(
             { role: "user", content: userPrompt },
           ],
           temperature: 0.7,
-          max_tokens: 16000,
+          max_tokens: 8000,
           stream: true,
         }),
       });

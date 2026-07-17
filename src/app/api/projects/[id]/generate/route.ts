@@ -8,8 +8,8 @@ import { getRouteForTask } from "@/services/ai";
 import { getProviderBaseUrl, getProviderApiKey, getProviderHeaders, parseSSEChunk } from "@/services/ai/providers/shared";
 import type { VideoInfo } from "@/lib/types";
 
-const PROVIDER_TIMEOUT_MS = 90_000;
-const STREAM_STALL_MS = 30_000;
+const PROVIDER_TIMEOUT_MS = 15_000;
+const STREAM_STALL_MS = 10_000;
 
 export async function POST(
   req: NextRequest,
@@ -87,7 +87,7 @@ export async function POST(
                     { role: "user", content: userPrompt },
                   ],
                   temperature: 0.7,
-                  max_tokens: 16000,
+                  max_tokens: 8000,
                   stream: true,
                 }),
                 signal: controller2.signal,
