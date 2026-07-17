@@ -5,6 +5,7 @@ export function getProviderBaseUrl(provider: string): string {
     openrouter: "https://openrouter.ai/api/v1/chat/completions",
     cerebras: "https://api.cerebras.ai/v1/chat/completions",
     mistral: "https://api.mistral.ai/v1/chat/completions",
+    tokengo: "https://api.tokengo.com/v1/chat/completions",
   };
   return urls[provider] || "";
 }
@@ -16,6 +17,7 @@ export function getProviderApiKey(provider: string): string | undefined {
     openrouter: process.env.OPENROUTER_API_KEY,
     cerebras: process.env.CEREBRAS_API_KEY,
     mistral: process.env.MISTRAL_API_KEY,
+    tokengo: process.env.THORBASE_API_KEY,
   };
   return keys[provider];
 }

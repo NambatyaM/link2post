@@ -151,6 +151,22 @@ export const PROVIDERS: Provider[] = [
       { id: "nvidia/llama-3.1-8b-instruct", label: "Llama 3.1 8B" },
     ],
   },
+  {
+    id: "tokengo",
+    label: "TokenGo",
+    tagline: "Cheapest",
+    baseUrl: "https://api.tokengo.com/v1/chat/completions",
+    envKey: "THORBASE_API_KEY",
+    models: [
+      { id: "deepseek-v4-flash", label: "DeepSeek V4 Flash" },
+      { id: "deepseek-v4-pro", label: "DeepSeek V4 Pro" },
+      { id: "deepseek-v3.2", label: "DeepSeek V3.2" },
+      { id: "glm-5.2", label: "GLM 5.2" },
+      { id: "glm-5.1", label: "GLM 5.1" },
+      { id: "kimi-k2.6", label: "Kimi K2.6" },
+      { id: "minimax-m2.5", label: "MiniMax M2.5" },
+    ],
+  },
 ];
 
 export function getProvider(id: string): Provider | undefined {

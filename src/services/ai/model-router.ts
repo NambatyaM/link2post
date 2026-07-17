@@ -5,6 +5,7 @@ import { callProvider as groqCall, callProviderWithModel as groqCallWithModel } 
 import { callProvider as openrouterCall, callProviderWithModel as openrouterCallWithModel } from "./providers/openrouter";
 import { callProvider as cerebrasCall } from "./providers/cerebras";
 import { callProvider as mistralCall } from "./providers/mistral";
+import { callProvider as tokengoCall, callProviderWithModel as tokengoCallWithModel } from "./providers/tokengo";
 
 interface RouteEntry {
   provider: string;
@@ -31,6 +32,9 @@ function buildRouteTable(): Record<TaskType, RouteEntry[]> {
       ...(checkApiKey("CEREBRAS_API_KEY")
         ? [{ provider: "cerebras", model: "llama-3.3-70b", call: cerebrasCall }]
         : []),
+      ...(checkApiKey("THORBASE_API_KEY")
+        ? [{ provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") }]
+        : []),
     ],
     brand_voice_learning: [
       ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
@@ -41,6 +45,9 @@ function buildRouteTable(): Record<TaskType, RouteEntry[]> {
         : []),
       ...(checkApiKey("GROQ_API_KEY")
         ? [{ provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") }]
+        : []),
+      ...(checkApiKey("THORBASE_API_KEY")
+        ? [{ provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") }]
         : []),
     ],
     post_generation: [
@@ -56,6 +63,12 @@ function buildRouteTable(): Record<TaskType, RouteEntry[]> {
       ...(checkApiKey("CEREBRAS_API_KEY")
         ? [{ provider: "cerebras", model: "llama-3.3-70b", call: cerebrasCall }]
         : []),
+      ...(checkApiKey("THORBASE_API_KEY")
+        ? [
+            { provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") },
+            { provider: "tokengo", model: "deepseek-v4-pro", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-pro") },
+          ]
+        : []),
     ],
     article_generation: [
       ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
@@ -66,6 +79,9 @@ function buildRouteTable(): Record<TaskType, RouteEntry[]> {
             { provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") },
             { provider: "openrouter", model: "meta-llama/llama-3.1-70b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "meta-llama/llama-3.1-70b-instruct") },
           ]
+        : []),
+      ...(checkApiKey("THORBASE_API_KEY")
+        ? [{ provider: "tokengo", model: "deepseek-v4-pro", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-pro") }]
         : []),
     ],
     carousel_generation: [
@@ -78,6 +94,9 @@ function buildRouteTable(): Record<TaskType, RouteEntry[]> {
       ...(checkApiKey("MISTRAL_API_KEY")
         ? [{ provider: "mistral", model: "mistral-small-latest", call: mistralCall }]
         : []),
+      ...(checkApiKey("THORBASE_API_KEY")
+        ? [{ provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") }]
+        : []),
     ],
     rewrite_edit: [
       ...(checkApiKey("GROQ_API_KEY")
@@ -88,6 +107,9 @@ function buildRouteTable(): Record<TaskType, RouteEntry[]> {
         : []),
       ...(checkApiKey("MISTRAL_API_KEY")
         ? [{ provider: "mistral", model: "mistral-small-latest", call: mistralCall }]
+        : []),
+      ...(checkApiKey("THORBASE_API_KEY")
+        ? [{ provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") }]
         : []),
     ],
     hook_generation: [
@@ -100,6 +122,9 @@ function buildRouteTable(): Record<TaskType, RouteEntry[]> {
       ...(checkApiKey("MISTRAL_API_KEY")
         ? [{ provider: "mistral", model: "mistral-small-latest", call: mistralCall }]
         : []),
+      ...(checkApiKey("THORBASE_API_KEY")
+        ? [{ provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") }]
+        : []),
     ],
     content_calendar: [
       ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
@@ -110,6 +135,9 @@ function buildRouteTable(): Record<TaskType, RouteEntry[]> {
         : []),
       ...(checkApiKey("GROQ_API_KEY")
         ? [{ provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") }]
+        : []),
+      ...(checkApiKey("THORBASE_API_KEY")
+        ? [{ provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") }]
         : []),
     ],
   };
