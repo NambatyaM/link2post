@@ -495,21 +495,40 @@ function ProjectContent({ projectId }: { projectId: string }) {
                 />
               </div>
             </div>
-            <div className="flex justify-end gap-2 mt-5">
+            <div className="flex justify-between items-center mt-5">
               <button
-                onClick={() => setEditingProject(false)}
+                onClick={async () => {
+                  if (!confirm("Delete this project and all its posts?")) return;
+                  const supabase = getSupabaseBrowser();
+                  const { data: { session } } = await supabase.auth.getSession();
+                  if (!session) return;
+                  await fetch(`/api/projects/${projectId}`, {
+                    method: "DELETE",
+                    headers: { Authorization: `Bearer ${session.access_token}` },
+                  });
+                  router.push("/projects");
+                }}
                 className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-                style={{ background: "var(--bg-secondary)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
+                style={{ background: "var(--bg-secondary)", color: "var(--error, #ef4444)", border: "1px solid var(--border)" }}
               >
-                Cancel
+                Delete Project
               </button>
-              <button
-                onClick={handleSaveProject}
-                className="text-xs font-medium px-4 py-1.5 rounded-lg transition-colors"
-                style={{ background: "var(--accent)", color: "white" }}
-              >
-                Save
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setEditingProject(false)}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                  style={{ background: "var(--bg-secondary)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveProject}
+                  className="text-xs font-medium px-4 py-1.5 rounded-lg transition-colors"
+                  style={{ background: "var(--accent)", color: "white" }}
+                >
+                  Save
+                </button>
+              </div>
             </div>
           </div>
         </div>

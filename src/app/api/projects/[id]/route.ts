@@ -147,3 +147,35 @@ export async function PATCH(
     return Response.json({ error: "Something went wrong" }, { status: 500 });
   }
 }
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  try {
+    const token = extractBearerToken(req);
+    if (!token) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    const user = await verifyToken(token);
+    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+    const { id: projectId } = await params;
+    const supabase = getSupabaseServer();
+
+    const { data: project } = await supabase
+      .from("projects")
+      .select("id")
+      .eq("id", projectId)
+      .eq("user_id", user.userId)
+      .single();
+
+    if (!project) return Response.json({ error: "Not found" }, { status: 404 });
+
+    await supabase.from("posts").delete().eq("project_id", projectId).eq("user_id", user.userId);
+    await supabase.from("projects").delete().eq("id", projectId).eq("user_id", user.userId);
+
+    return Response.json({ success: true });
+  } catch (error) {
+    console.error("Project DELETE error:", error);
+    return Response.json({ error: "Something went wrong" }, { status: 500 });
+  }
+}

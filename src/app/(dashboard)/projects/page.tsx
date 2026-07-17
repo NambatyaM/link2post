@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import Link from "next/link";
+import { useState, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import type { Project } from "@/lib/types";
 
@@ -45,8 +45,25 @@ function SkeletonRow() {
 }
 
 export default function ProjectsPage() {
+  const router = useRouter();
   const [projects, setProjects] = useState<ProjectRow[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const handleDelete = useCallback(async (e: React.MouseEvent, projectId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm("Delete this project and all its posts?")) return;
+    try {
+      const supabase = getSupabaseBrowser();
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      await fetch(`/api/projects/${projectId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+    } catch { /* */ }
+  }, []);
 
   useEffect(() => {
     async function fetchProjects() {
@@ -89,8 +106,8 @@ export default function ProjectsPage() {
             All your content generation projects
           </p>
         </div>
-        <Link
-          href="/projects/new"
+        <button
+          onClick={() => router.push("/projects/new")}
           className="btn-primary text-sm flex items-center gap-2"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -98,7 +115,7 @@ export default function ProjectsPage() {
             <line x1="5" y1="12" x2="19" y2="12" />
           </svg>
           New Project
-        </Link>
+        </button>
       </div>
 
       {loading ? (
@@ -116,8 +133,8 @@ export default function ProjectsPage() {
           <p className="text-sm mb-4" style={{ color: "var(--text-muted)" }}>
             No projects yet
           </p>
-          <Link
-            href="/projects/new"
+          <button
+            onClick={() => router.push("/projects/new")}
             className="btn-primary text-sm inline-flex items-center gap-2"
           >
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -125,7 +142,7 @@ export default function ProjectsPage() {
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
             Create your first project
-          </Link>
+          </button>
         </div>
       ) : (
         <div className="flex flex-col gap-1">
@@ -138,11 +155,11 @@ export default function ProjectsPage() {
           {projects.map((project) => {
             const statusStyle = getStatusColor(project.status);
             return (
-              <Link
+              <div
                 key={project.id}
-                href={`/projects/${project.id}`}
-                className="flex items-center gap-4 rounded-lg px-5 py-4 transition-colors hover:opacity-80"
-                style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
+                className="flex items-center gap-4 rounded-lg px-5 py-4 transition-colors"
+                style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)", cursor: "pointer" }}
+                onClick={() => router.push(`/projects/${project.id}`)}
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate" style={{ color: "var(--text-primary)" }}>
@@ -164,7 +181,18 @@ export default function ProjectsPage() {
                 <span className="w-12 text-sm font-medium text-center shrink-0" style={{ color: "var(--text-primary)" }}>
                   {project.postCount}
                 </span>
-              </Link>
+                <button
+                  onClick={(e) => handleDelete(e, project.id)}
+                  className="shrink-0 p-1.5 rounded-md transition-colors hover:opacity-80"
+                  style={{ color: "var(--text-muted)" }}
+                  title="Delete project"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                  </svg>
+                </button>
+              </div>
             );
           })}
         </div>
