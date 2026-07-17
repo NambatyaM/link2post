@@ -44,7 +44,6 @@ export async function POST(req: NextRequest) {
     }
 
     let userId: string | undefined;
-    let plan: "anonymous" | "free" | "starter" | "pro" = "anonymous";
 
     const token = extractBearerToken(req);
     const deviceId = req.headers.get("x-device-id") || undefined;
@@ -53,11 +52,10 @@ export async function POST(req: NextRequest) {
       const user = await verifyToken(token);
       if (user) {
         userId = user.userId;
-        plan = "free";
       }
     }
 
-    const rateResult = await checkRateLimit({ userId, deviceId, plan });
+    const rateResult = await checkRateLimit({ userId, deviceId });
     if (!rateResult.allowed) {
       return Response.json({ error: "Rate limit exceeded." }, { status: 429, headers: getRateLimitHeaders(rateResult) });
     }
