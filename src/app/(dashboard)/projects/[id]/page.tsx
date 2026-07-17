@@ -131,7 +131,9 @@ function ProjectContent({ projectId }: { projectId: string }) {
     try {
       const supabase = getSupabaseBrowser();
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session) return;
+      if (!session) {
+        throw new Error("Not logged in");
+      }
 
       const voiceProfilePrompt = localStorage.getItem("link2post_voice_prompt") || "";
 
@@ -377,13 +379,20 @@ function ProjectContent({ projectId }: { projectId: string }) {
         </div>
 
         <div className="flex-1 overflow-y-auto p-6" style={{ background: "var(--bg-primary)" }}>
-          {generating && generateProgress ? (
+          {generating && generateProgress && posts.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full gap-4">
               <div className="h-10 w-10 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--border)", borderTopColor: "var(--accent)" }} />
               <p className="text-sm" style={{ color: "var(--accent)" }}>{generateProgress}</p>
               <p className="text-xs" style={{ color: "var(--text-muted)" }}>Generating your content...</p>
             </div>
           ) : selectedIndex !== null && posts[selectedIndex] ? (
+            <>
+              {generating && generateProgress && (
+                <div className="mb-4 flex items-center gap-2.5 px-4 py-2.5 rounded-lg" style={{ background: "var(--accent)10", border: "1px solid var(--accent)30" }}>
+                  <div className="h-3 w-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: "var(--accent)50", borderTopColor: "var(--accent)" }} />
+                  <span className="text-xs font-medium" style={{ color: "var(--accent)" }}>{generateProgress}</span>
+                </div>
+              )}
             <PostEditor
               key={selectedIndex}
               post={posts[selectedIndex]}
@@ -393,6 +402,7 @@ function ProjectContent({ projectId }: { projectId: string }) {
               onApprove={() => handleApprove(selectedIndex)}
               onDiscard={handleDiscard}
             />
+            </>
           ) : (
             <div className="flex items-center justify-center h-full">
               <p className="text-sm" style={{ color: "var(--text-muted)" }}>
