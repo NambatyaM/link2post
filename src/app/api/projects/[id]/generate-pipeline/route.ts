@@ -10,6 +10,8 @@ import {
 import { getProviderBaseUrl, getProviderApiKey, getProviderHeaders } from "@/services/ai/providers/shared";
 import type { VideoInfo } from "@/lib/types";
 
+export const maxDuration = 120;
+
 const CALL_TIMEOUT_MS = 25_000;
 
 function parseJsonResponse<T>(raw: string): T | null {
@@ -82,6 +84,7 @@ async function callAI(
       if (!response.ok) {
         const errText = await response.text().catch(() => "");
         errors.push(`${provider.id}: HTTP ${response.status} ${errText.slice(0, 100)}`);
+        console.warn(`[pipeline:${taskLabel}] ${provider.id} HTTP ${response.status}`);
         continue;
       }
 
@@ -107,34 +110,21 @@ async function callAI(
   throw new Error(`[pipeline:${taskLabel}] All providers failed: ${errors.join("; ")}`);
 }
 
-async function saveGeneratedContent(
+async function savePosts(
   supabase: ReturnType<typeof getSupabaseServer>,
   projectId: string,
   userId: string,
-  rawContent: string,
-  status: "completed" | "failed",
+  posts: Array<{ hook: string; body: string; imagePrompt: string; viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number }>,
 ) {
-  try {
-    await supabase.from("projects").update({ status }).eq("id", projectId).eq("user_id", userId);
-    if (status === "completed" && rawContent) {
-      let parsed: { posts?: Array<{ hook: string; body: string; imagePrompt: string; viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number }> } | null = null;
-      try { parsed = JSON.parse(rawContent); } catch {
-        const s = rawContent.indexOf("{");
-        const e = rawContent.lastIndexOf("}");
-        if (s !== -1 && e > s) try { parsed = JSON.parse(rawContent.slice(s, e + 1)); } catch { /* */ }
-      }
-      if (parsed?.posts) {
-        const rows = parsed.posts.map((p) => ({
-          project_id: projectId, user_id: userId,
-          content: p.hook + "\n\n" + p.body, hook: p.hook, post_type: "story",
-          virality_score: p.viralityScore ?? 0, authority_score: p.authorityScore ?? 0,
-          comment_potential: p.commentPotential ?? 0, readability_score: p.readabilityScore ?? 0,
-          image_prompt: p.imagePrompt, status: "draft",
-        }));
-        if (rows.length > 0) await supabase.from("posts").insert(rows);
-      }
-    }
-  } catch (e) { console.error("saveGeneratedContent error:", e); }
+  if (posts.length === 0) return;
+  const rows = posts.map((p) => ({
+    project_id: projectId, user_id: userId,
+    content: p.hook + "\n\n" + p.body, hook: p.hook, post_type: "story",
+    virality_score: p.viralityScore ?? 0, authority_score: p.authorityScore ?? 0,
+    comment_potential: p.commentPotential ?? 0, readability_score: p.readabilityScore ?? 0,
+    image_prompt: p.imagePrompt, status: "draft",
+  }));
+  await supabase.from("posts").insert(rows);
 }
 
 interface AnalysisResult {
@@ -198,113 +188,82 @@ export async function POST(
       return Response.json({ error: "No AI providers configured. Add GEMINI_API_KEY or GROQ_API_KEY to Vercel env vars." }, { status: 503 });
     }
 
+    console.log(`[pipeline] Starting for project ${projectId}, providers: ${providers.map((p) => p.id).join(", ")}`);
+
     const videoInfo: VideoInfo = { title: project.title, description: "", transcript: project.raw_transcript, url: "", videoId: "" };
-    const encoder = new TextEncoder();
     const allContent = { posts: [] as PostsResult["posts"], articles: [] as ArticlesCalendarResult["articles"] };
 
-    const stream = new ReadableStream({
-      async start(controller) {
-        const send = (data: Record<string, unknown>) => {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
-        };
+    // ═══════════════════════════════════════════════════════════════
+    // CALL 1: Analysis
+    // ═══════════════════════════════════════════════════════════════
+    console.log("[pipeline] Call 1: Analysis starting");
+    const analysisPrompt = buildAnalysisPrompt(videoInfo);
+    const analysisResult = await callAI("analysis", providers, [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: analysisPrompt },
+    ], 6000);
 
-        try {
-          // ═══════════════════════════════════════════════════════════════
-          // CALL 1: Analysis
-          // ═══════════════════════════════════════════════════════════════
-          console.log("[pipeline] Call 1: Analysis starting");
-          send({ step: "analysis", status: "started", message: "Analyzing transcript..." });
+    const analysis = parseJsonResponse<AnalysisResult>(analysisResult.content);
+    if (!analysis || !analysis.ideas) {
+      await supabase.from("projects").update({ status: "failed" }).eq("id", projectId).eq("user_id", user.userId);
+      return Response.json({ error: "Failed to parse analysis response from AI", detail: analysisResult.content.slice(0, 500) }, { status: 500 });
+    }
 
-          const analysisPrompt = buildAnalysisPrompt(videoInfo);
-          const analysisResult = await callAI("analysis", providers, [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: analysisPrompt },
-          ], 6000);
+    console.log(`[pipeline] Call 1 done: ${analysisResult.provider}/${analysisResult.model} in ${analysisResult.latencyMs}ms, ${analysis.ideas.length} ideas`);
 
-          const analysis = parseJsonResponse<AnalysisResult>(analysisResult.content);
-          if (!analysis || !analysis.ideas) throw new Error("Failed to parse analysis — no ideas found");
+    // ═══════════════════════════════════════════════════════════════
+    // CALLS 2 & 3: Posts + Articles/Calendar (PARALLEL)
+    // ═══════════════════════════════════════════════════════════════
+    console.log("[pipeline] Calls 2 & 3: Parallel");
 
-          console.log(`[pipeline] Call 1 done: ${analysisResult.provider}/${analysisResult.model} in ${analysisResult.latencyMs}ms, ${analysis.ideas.length} ideas`);
-          send({
-            step: "analysis", status: "completed",
-            provider: analysisResult.provider, model: analysisResult.model, latencyMs: analysisResult.latencyMs,
-            ideasCount: analysis.ideas.length, voiceProfile: analysis.voice_profile,
-          });
+    const postsPrompt = buildPostsPrompt(analysis.voice_profile, analysis.ideas, 5);
+    const articlesPrompt = buildArticlesCalendarPrompt(analysis.voice_profile, [], analysis.ideas, 2);
 
-          // ═══════════════════════════════════════════════════════════════
-          // CALLS 2 & 3: Posts + Articles/Calendar (PARALLEL)
-          // ═══════════════════════════════════════════════════════════════
-          console.log("[pipeline] Calls 2 & 3: Parallel");
-          send({ step: "posts", status: "started", message: "Generating posts..." });
-          send({ step: "articles", status: "started", message: "Generating articles & calendar..." });
+    const postsMessages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: postsPrompt },
+    ];
+    const articlesMessages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: articlesPrompt },
+    ];
 
-          const postsPrompt = buildPostsPrompt(analysis.voice_profile, analysis.ideas, 5);
-          const articlesPrompt = buildArticlesCalendarPrompt(analysis.voice_profile, [], analysis.ideas, 2);
+    const [postsResult, articlesResult] = await Promise.all([
+      callAI("posts", providers, postsMessages, 6000).catch((e) => { console.error("[pipeline] Posts failed:", e.message); return null; }),
+      callAI("articles", providers, articlesMessages, 8000).catch((e) => { console.error("[pipeline] Articles failed:", e.message); return null; }),
+    ]);
 
-          const postsMessages = [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: postsPrompt },
-          ];
-          const articlesMessages = [
-            { role: "system", content: SYSTEM_PROMPT },
-            { role: "user", content: articlesPrompt },
-          ];
+    if (postsResult) {
+      const postsData = parseJsonResponse<PostsResult>(postsResult.content);
+      if (postsData?.posts) {
+        allContent.posts = postsData.posts;
+        console.log(`[pipeline] Call 2 done: ${postsResult.provider}/${postsResult.model} in ${postsResult.latencyMs}ms, ${postsData.posts.length} posts`);
+      }
+    }
 
-          const [postsResult, articlesResult] = await Promise.all([
-            callAI("posts", providers, postsMessages, 6000).catch((e) => { console.error("[pipeline] Posts failed:", e.message); return null; }),
-            callAI("articles", providers, articlesMessages, 8000).catch((e) => { console.error("[pipeline] Articles failed:", e.message); return null; }),
-          ]);
+    if (articlesResult) {
+      const articlesData = parseJsonResponse<ArticlesCalendarResult>(articlesResult.content);
+      if (articlesData) {
+        allContent.articles = articlesData.articles || [];
+        console.log(`[pipeline] Call 3 done: ${articlesResult.provider}/${articlesResult.model} in ${articlesResult.latencyMs}ms`);
+      }
+    }
 
-          if (postsResult) {
-            const postsData = parseJsonResponse<PostsResult>(postsResult.content);
-            if (postsData?.posts) {
-              allContent.posts = postsData.posts;
-              console.log(`[pipeline] Call 2 done: ${postsResult.provider}/${postsResult.model} in ${postsResult.latencyMs}ms, ${postsData.posts.length} posts`);
-              send({
-                step: "posts", status: "completed",
-                provider: postsResult.provider, model: postsResult.model, latencyMs: postsResult.latencyMs,
-                posts: postsData.posts,
-              });
-            }
-          }
+    // ═══════════════════════════════════════════════════════════════
+    // SAVE & COMPLETE
+    // ═══════════════════════════════════════════════════════════════
+    await savePosts(supabase, projectId, user.userId, allContent.posts);
+    await supabase.from("projects").update({ status: "completed" }).eq("id", projectId).eq("user_id", user.userId);
 
-          if (articlesResult) {
-            const articlesData = parseJsonResponse<ArticlesCalendarResult>(articlesResult.content);
-            if (articlesData) {
-              allContent.articles = articlesData.articles || [];
-              console.log(`[pipeline] Call 3 done: ${articlesResult.provider}/${articlesResult.model} in ${articlesResult.latencyMs}ms`);
-              send({
-                step: "articles", status: "completed",
-                provider: articlesResult.provider, model: articlesResult.model, latencyMs: articlesResult.latencyMs,
-                articles: articlesData.articles, carousel: articlesData.carousel, calendar: articlesData.calendar,
-              });
-            }
-          }
+    console.log(`[pipeline] Complete: ${allContent.posts.length} posts, ${allContent.articles.length} articles`);
 
-          // ═══════════════════════════════════════════════════════════════
-          // SAVE & COMPLETE
-          // ═══════════════════════════════════════════════════════════════
-          await saveGeneratedContent(supabase, projectId, user.userId, JSON.stringify({ posts: allContent.posts, articles: allContent.articles }), "completed");
-
-          send({ step: "complete", status: "completed" });
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-        } catch (err) {
-          console.error("[pipeline] Fatal:", err);
-          await saveGeneratedContent(supabase, projectId, user.userId, "", "failed");
-          send({ step: "error", status: "failed", error: err instanceof Error ? err.message : "Generation failed" });
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-        }
-      },
-    });
-
-    return new Response(stream, {
-      status: 200,
-      headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive" },
+    return Response.json({
+      success: true,
+      posts: allContent.posts,
+      articles: allContent.articles,
     });
   } catch (error) {
-    console.error("Pipeline error:", error);
-    return Response.json({ error: "Something went wrong" }, { status: 500 });
+    console.error("[pipeline] Fatal:", error);
+    return Response.json({ error: error instanceof Error ? error.message : "Generation failed" }, { status: 500 });
   }
 }

@@ -167,6 +167,8 @@ function ProjectContent({ projectId }: { projectId: string }) {
 
       const voiceProfilePrompt = localStorage.getItem("link2post_voice_prompt") || "";
 
+      setGenerateProgress("Analyzing transcript...");
+
       const response = await fetch(`/api/projects/${projectId}/generate-pipeline`, {
         method: "POST",
         headers: {
@@ -184,66 +186,26 @@ function ProjectContent({ projectId }: { projectId: string }) {
         throw new Error(errData.error || "Generation failed");
       }
 
-      const reader = response.body?.getReader();
-      if (!reader) throw new Error("No response stream");
+      const data = await response.json();
 
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split("\n");
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const data = line.slice(6);
-          if (data === "[DONE]") continue;
-
-          try {
-            const parsed = JSON.parse(data);
-
-            if (parsed.step === "analysis" && parsed.status === "started") {
-              setGenerateProgress(parsed.message || "Analyzing transcript...");
-            } else if (parsed.step === "analysis" && parsed.status === "completed") {
-              setGenerateProgress(`Analysis done (${parsed.latencyMs}ms) — extracting ideas...`);
-            } else if (parsed.step === "posts" && parsed.status === "started") {
-              setGenerateProgress(parsed.message || "Generating posts...");
-            } else if (parsed.step === "posts" && parsed.status === "completed") {
-              if (parsed.posts) {
-                const newPosts: LinkedInPost[] = parsed.posts.map((post: { hook: string; body: string; imagePrompt: string; viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number }) => ({
-                  hook: post.hook,
-                  body: post.body,
-                  imagePrompt: post.imagePrompt,
-                  viralityScore: post.viralityScore ?? 0,
-                  authorityScore: post.authorityScore ?? 0,
-                  commentPotential: post.commentPotential ?? 0,
-                  readabilityScore: post.readabilityScore ?? 0,
-                  status: "draft" as const,
-                }));
-                setPosts(newPosts);
-                postsReceivedRef.current = true;
-                if (newPosts.length > 0) setSelectedIndex(0);
-              }
-              setGenerateProgress(`Posts ready (${parsed.latencyMs}ms) — generating articles...`);
-            } else if (parsed.step === "articles" && parsed.status === "completed") {
-              setGenerateProgress("Content generation complete!");
-            } else if (parsed.step === "error") {
-              throw new Error(parsed.error || "Generation failed");
-            }
-          } catch (e) {
-            if (e instanceof Error && e.message !== "Generation failed") {
-              /* skip parse errors */
-            } else {
-              throw e;
-            }
-          }
-        }
+      if (data.posts && data.posts.length > 0) {
+        const newPosts: LinkedInPost[] = data.posts.map((post: { hook: string; body: string; imagePrompt: string; viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number }) => ({
+          hook: post.hook,
+          body: post.body,
+          imagePrompt: post.imagePrompt,
+          viralityScore: post.viralityScore ?? 0,
+          authorityScore: post.authorityScore ?? 0,
+          commentPotential: post.commentPotential ?? 0,
+          readabilityScore: post.readabilityScore ?? 0,
+          status: "draft" as const,
+        }));
+        setPosts(newPosts);
+        postsReceivedRef.current = true;
+        if (newPosts.length > 0) setSelectedIndex(0);
       }
 
       setGenerateProgress("");
-      setSaveMessage(postsReceivedRef.current ? "Content generated!" : "Generation finished but no posts — check API keys in Vercel");
+      setSaveMessage(data.posts?.length ? `Generated ${data.posts.length} posts!` : "Generation complete");
       setTimeout(() => setSaveMessage(""), 3000);
     } catch (err) {
       setGenerateProgress("");
