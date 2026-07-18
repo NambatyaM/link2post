@@ -68,28 +68,29 @@ export async function callAI(
 ): Promise<CallAIResult> {
   const errors: string[] = [];
 
-  const results = await Promise.allSettled(
-    providers.map((p) =>
+  const raceMap = new Map(
+    providers.map((p) => [
+      p.id,
       tryProvider(p, messages, maxTokens)
-        .then((r) => ({ provider: p.id, result: r }))
+        .then((r) => ({ ok: true as const, result: r, provider: p }))
         .catch((err) => {
           const msg = err instanceof Error ? err.message : String(err);
-          errors.push(`${p.id}: ${msg}`);
-          console.warn(`[pipeline:${taskLabel}] ${p.id} failed: ${msg}`);
-          return { provider: p.id, result: null };
+          return { ok: false as const, provider: p, msg };
         }),
-    ),
+    ]),
   );
 
-  const successes = results
-    .map((r) => (r.status === "fulfilled" ? r.value : null))
-    .filter((r): r is { provider: string; result: CallAIResult } => r !== null && r.result !== null)
-    .sort((a, b) => a.result.latencyMs - b.result.latencyMs);
+  while (raceMap.size > 0) {
+    const winner = await Promise.race([...raceMap.values()]);
+    raceMap.delete(winner.provider.id);
 
-  if (successes.length > 0) {
-    const best = successes[0];
-    console.log(`[pipeline:${taskLabel}] Success: ${best.provider}/${best.result.model} in ${best.result.latencyMs}ms`);
-    return best.result;
+    if (winner.ok) {
+      console.log(`[pipeline:${taskLabel}] Success: ${winner.provider.id}/${winner.result.model} in ${winner.result.latencyMs}ms`);
+      return winner.result;
+    }
+
+    errors.push(`${winner.provider.id}: ${winner.msg}`);
+    console.warn(`[pipeline:${taskLabel}] ${winner.provider.id} failed: ${winner.msg}`);
   }
 
   throw new Error(`[pipeline:${taskLabel}] All providers failed: ${errors.join("; ")}`);
