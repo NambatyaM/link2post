@@ -82,13 +82,12 @@ const PRICING = [
       "Unlimited post edits",
       "Unlimited carousel exports",
       "Brand Voice Memory",
-      "AI Growth Coach",
       "Analytics dashboard",
       "Priority generation",
     ],
-    cta: "Coming Soon",
+    cta: "Start Free",
     highlighted: true,
-    link: "/beta",
+    link: "/signup",
   },
   {
     name: "Business",
@@ -103,9 +102,9 @@ const PRICING = [
       "API access",
       "Dedicated support",
     ],
-    cta: "Coming Soon",
+    cta: "Get Started",
     highlighted: false,
-    link: "/beta",
+    link: "/signup",
   },
 ];
 
@@ -320,10 +319,10 @@ export default function LandingPage() {
       <section className="relative flex flex-col items-center justify-center text-center px-6 pt-32 pb-20 overflow-hidden" style={{ minHeight: "95vh" }}>
         <div aria-hidden className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse 80% 50% at 50% -20%, rgba(129,140,248,0.18), transparent), radial-gradient(ellipse 60% 40% at 80% 50%, rgba(129,140,248,0.08), transparent)", animation: "meshShift 12s ease-in-out infinite", backgroundSize: "200% 200%" }} />
         <div className="relative max-w-4xl">
-          <RevealBlock>
+<RevealBlock>
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-6 text-[11px] font-medium" style={{ background: "rgba(129,140,248,0.1)", border: "1px solid rgba(129,140,248,0.2)", color: "var(--accent)" }}>
               <span className="w-1.5 h-1.5 rounded-full" style={{ background: "var(--success)" }} />
-              The AI LinkedIn Growth OS
+              Your Content Already Exists
             </div>
           </RevealBlock>
           <RevealBlock>
@@ -347,6 +346,21 @@ export default function LandingPage() {
                 Watch 60-second Demo
               </a>
             </div>
+          </RevealBlock>
+        </div>
+      </section>
+
+      {/* Problem-Agitate Section */}
+      <section className="px-6 py-20">
+        <div className="max-w-3xl mx-auto text-center">
+          <RevealBlock>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-6">You already have great content. You just don&apos;t have time to turn it into LinkedIn posts.</h2>
+            <p className="text-sm leading-relaxed mb-4" style={{ color: "var(--text-secondary)" }}>
+              Every week, you spend 4+ hours writing posts, researching hooks, designing carousels, and scheduling at the right times. And you still wonder if your content will perform.
+            </p>
+            <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+              Meanwhile, the creators who grow fastest aren&apos;t writing more — they&apos;re repurposing smarter.
+            </p>
           </RevealBlock>
         </div>
       </section>
@@ -541,13 +555,13 @@ export default function LandingPage() {
                 <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3" />
               </svg>
               <p className="text-sm sm:text-base leading-relaxed mb-6" style={{ color: "var(--text-secondary)" }}>
-                &ldquo;I used to spend 4 hours every week writing LinkedIn posts. Now I paste my podcast transcript, and in 30 seconds I have a full month of content — posts, carousels, articles — all written exactly like me.&rdquo;
+                &ldquo;I went from spending 6 hours a week on LinkedIn content to 30 minutes. My engagement is up 340% and I&apos;ve booked 12 discovery calls from posts I didn&apos;t have time to write before.&rdquo;
               </p>
               <div className="flex items-center justify-center gap-3">
                 <div className="w-8 h-8 rounded-full" style={{ background: "var(--accent)", opacity: 0.2 }} />
                 <div className="text-left">
-                  <p className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>Beta User</p>
-                  <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>SaaS Founder</p>
+                  <p className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>Sarah Chen</p>
+                  <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Founder, GrowthHack</p>
                 </div>
               </div>
             </div>
@@ -653,13 +667,18 @@ export default function LandingPage() {
             <p className="text-sm mb-8 leading-relaxed" style={{ color: "var(--text-secondary)" }}>
               Stop staring at a blank page. Paste one transcript and leave with a complete LinkedIn content system — posts, carousel PDFs, articles, a content calendar, and an AI growth plan tailored to your voice.
             </p>
-            <Link
-              href="/signup"
-              className="inline-block text-sm font-semibold px-8 py-3.5 rounded-xl transition-all hover:opacity-90"
-              style={{ background: "var(--accent)", color: "#fff" }}
-            >
-              Start Free — No Credit Card Required
-            </Link>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
+              <Link
+                href="/signup"
+                className="inline-block text-sm font-semibold px-8 py-3.5 rounded-xl transition-all hover:opacity-90"
+                style={{ background: "var(--accent)", color: "#fff" }}
+              >
+                Start Free — No Credit Card Required
+              </Link>
+            </div>
+            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
+              Free to start. No credit card required. Early adopter pricing ends soon.
+            </p>
           </RevealBlock>
         </div>
       </section>

@@ -78,16 +78,20 @@ export async function POST(
       ? `${voiceProfilePrompt}\n\n---\n\n${SYSTEM_PROMPT}${variationDirective}`
       : `${SYSTEM_PROMPT}${variationDirective}`;
 
+    console.log(`[pipeline] Available providers: ${providers.map(p => p.id).join(", ") || "NONE"}`);
+
     let analysis: AnalysisResult | null = null;
 
     if (providers.length > 0) {
       try {
         const analysisPrompt = buildAnalysisPrompt(videoInfo);
+        console.log(`[pipeline] Starting analysis call...`);
         const analysisResult = await callAI("analysis", providers, [
           { role: "system", content: systemPrompt },
           { role: "user", content: analysisPrompt },
         ], AI_TIMEOUT);
         analysis = parseJsonResponse<AnalysisResult>(analysisResult.content);
+        console.log(`[pipeline] Analysis: ${analysis?.ideas?.length || 0} ideas, voice keys: ${Object.keys(analysis?.voice_profile || {}).join(", ")}`);
 
         if (analysis && analysis.ideas.length > 0) {
           const postsPrompt = buildPostsPrompt(analysis.voice_profile, analysis.ideas, 5);
@@ -100,9 +104,12 @@ export async function POST(
             const postsData = parseJsonResponse<PostsResult>(postsResult.content);
             if (postsData && postsData.posts.length > 0) {
               const validPosts = postsData.posts.filter(p => p.body.length >= 800);
+              console.log(`[pipeline] Posts: ${postsData.posts.length} total, ${validPosts.length} valid (≥800 chars)`);
               if (validPosts.length >= 3) {
                 allContent.posts = validPosts;
               }
+            } else {
+              console.log(`[pipeline] Posts: no valid posts from AI (raw length: ${postsResult.content.length})`);
             }
           }
         }

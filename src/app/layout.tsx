@@ -11,15 +11,16 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Link2Post — Paste Once. Build a Month of LinkedIn Authority.",
+  title: "Link2Post — Paste One Transcript. Get 30 Days of LinkedIn Content.",
   description:
-    "The AI ghostwriter that turns your podcasts, meetings, and notes into high-performing LinkedIn content — complete with visual asset strategies.",
+    "Turn any transcript (podcast, meeting, YouTube) into a month of LinkedIn posts, carousels, articles, and a content calendar. Written in your voice. Free to start.",
   icons: { icon: "/logo.png" },
   openGraph: {
     title: "Link2Post — Paste Once. Build a Month of LinkedIn Authority.",
-    description: "Transform raw transcripts into a month of authentic, high-performing LinkedIn content with AI-powered visual strategies.",
+    description: "Transform raw transcripts into 30 days of authentic, high-performing LinkedIn content with AI-powered visual strategies.",
     type: "website",
   },
+  keywords: ["LinkedIn content", "content repurposing", "AI writing", "LinkedIn growth", "content calendar", "carousel maker", "ghostwriter"],
 };
 
 const THEME_INIT = `
