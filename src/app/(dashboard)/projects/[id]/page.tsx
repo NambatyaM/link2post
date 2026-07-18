@@ -194,7 +194,7 @@ function ProjectContent({ projectId }: { projectId: string }) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          audience: project.audience,
+          audience: project.audience || undefined,
           voiceProfilePrompt,
         }),
       });
