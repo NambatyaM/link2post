@@ -1,13 +1,13 @@
 import { getProviderBaseUrl, getProviderApiKey, getProviderHeaders } from "@/services/ai/providers/shared";
 import type { CallAIResult } from "./types";
 
-export const CALL_TIMEOUT_MS = 10_000;
+export const CALL_TIMEOUT_MS = 8_000;
 
 export function getAvailableProviders(): Array<{ id: string; model: string }> {
   const providers: Array<{ id: string; model: string }> = [];
   const tryProviders = [
-    { id: "gemini", model: "gemini-2.0-flash", envKey: "GEMINI_API_KEY" },
     { id: "groq", model: "llama-3.3-70b-versatile", envKey: "GROQ_API_KEY" },
+    { id: "gemini", model: "gemini-2.0-flash", envKey: "GEMINI_API_KEY" },
     { id: "openrouter", model: "qwen/qwen-2.5-72b-instruct", envKey: "OPENROUTER_API_KEY" },
     { id: "cerebras", model: "llama-3.3-70b", envKey: "CEREBRAS_API_KEY" },
     { id: "mistral", model: "mistral-small-latest", envKey: "MISTRAL_API_KEY" },

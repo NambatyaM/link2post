@@ -49,8 +49,8 @@ export async function POST(req: NextRequest) {
       model?: string;
     };
 
-    if (!videoInfo?.transcript || videoInfo.transcript.length < 100) {
-      return Response.json({ error: "Transcript is too short or missing." }, { status: 400 });
+    if (!videoInfo?.transcript || videoInfo.transcript.trim().length === 0) {
+      return Response.json({ error: "Transcript is missing." }, { status: 400 });
     }
 
     let userId: string | undefined;

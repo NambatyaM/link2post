@@ -48,9 +48,9 @@ const MOCK_VOICE: VoiceData = {
 };
 
 const PLANS = [
-  { name: "Free", price: "$0", features: ["5 projects/month", "Basic templates", "Standard AI"], current: true },
-  { name: "Pro", price: "$29/mo", features: ["Unlimited projects", "Voice profiling", "Priority AI", "Calendar scheduling"], current: false },
-  { name: "Business", price: "$99/mo", features: ["Team seats", "Custom branding", "API access", "Dedicated support"], current: false },
+  { name: "Free", price: "$0", features: ["5 projects/month", "Basic templates"], current: true },
+  { name: "Pro", price: "$15/mo", features: ["Unlimited projects", "Voice profiling", "Calendar scheduling"], current: false },
+  { name: "Business", price: "$49/mo", features: ["Team seats", "Custom branding", "API access", "Dedicated support"], current: false },
 ];
 
 export default function SettingsPage() {

@@ -74,7 +74,7 @@ const PRICING = [
   },
   {
     name: "Pro",
-    price: "$29",
+    price: "$15",
     period: "/month",
     features: [
       "20 projects",
@@ -92,7 +92,7 @@ const PRICING = [
   },
   {
     name: "Business",
-    price: "$99",
+    price: "$49",
     period: "/month",
     features: [
       "Unlimited projects",

@@ -31,14 +31,14 @@ function makeRequest(body: object, headers?: Record<string, string>): NextReques
 }
 
 describe("POST /api/generate", () => {
-  it("rejects short transcript", async () => {
+  it("rejects empty transcript", async () => {
     const res = await POST(makeRequest({
-      videoInfo: { title: "T", description: "D", transcript: "short", url: "url", videoId: "x" },
+      videoInfo: { title: "T", description: "D", transcript: "   ", url: "url", videoId: "x" },
       timezone: "America/New_York",
     }));
     const data = await res.json();
     expect(res.status).toBe(400);
-    expect(data.error).toContain("too short");
+    expect(data.error).toContain("missing");
   });
 
   it("returns streaming response with valid SSE format (mock mode)", async () => {

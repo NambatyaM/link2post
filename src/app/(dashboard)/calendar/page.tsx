@@ -236,8 +236,8 @@ export default function CalendarPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>Content Calendar</h1>
-          <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>Your LinkedIn content planner</p>
+          <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>Post Tracker</h1>
+          <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>Assign dates to your posts</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex rounded-lg overflow-hidden" style={{ border: "1px solid var(--border)" }}>

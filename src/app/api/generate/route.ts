@@ -202,9 +202,9 @@ export async function POST(req: NextRequest) {
       contentType?: ContentType;
     };
 
-    if (!videoInfo?.transcript || videoInfo.transcript.length < 100) {
+    if (!videoInfo?.transcript || videoInfo.transcript.trim().length === 0) {
       return Response.json(
-        { error: "Video transcript is too short or missing." },
+        { error: "Video transcript is missing." },
         { status: 400 },
       );
     }

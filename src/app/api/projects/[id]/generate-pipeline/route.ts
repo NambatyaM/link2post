@@ -16,6 +16,8 @@ import { savePosts } from "@/lib/pipeline/saver";
 import { GeneratePipelineParamsSchema, GeneratePipelineBodySchema } from "@/lib/pipeline/validation";
 import type { AnalysisResult, PostsResult, ArticlesCalendarResult } from "@/lib/pipeline/types";
 
+const AI_TIMEOUT = 5_000;
+
 export const maxDuration = 120;
 
 export async function POST(
@@ -67,21 +69,66 @@ export async function POST(
     await supabase.from("projects").update({ status: "processing" }).eq("id", projectId).eq("user_id", userId);
 
     const videoInfo: VideoInfo = { title: project.title, description: "", transcript: project.raw_transcript, url: "", videoId: "" };
+    const allContent = { posts: [] as PostsResult["posts"], articles: [] as ArticlesCalendarResult["articles"] };
+    const providers = getAvailableProviders();
+    const systemPrompt = voiceProfilePrompt
+      ? `${voiceProfilePrompt}\n\n---\n\n${SYSTEM_PROMPT}`
+      : SYSTEM_PROMPT;
 
-    const localResult = generateFullLinkedInResponse(videoInfo);
+    let analysis: AnalysisResult | null = null;
 
-    const allContent = {
-      posts: localResult.posts.map((p) => ({
+    if (providers.length > 0) {
+      try {
+        const analysisPrompt = buildAnalysisPrompt(videoInfo);
+        const analysisResult = await callAI("analysis", providers, [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: analysisPrompt },
+        ], AI_TIMEOUT);
+        analysis = parseJsonResponse<AnalysisResult>(analysisResult.content);
+
+        if (analysis && analysis.ideas.length > 0) {
+          const postsPrompt = buildPostsPrompt(analysis.voice_profile, analysis.ideas, 5);
+          const postsResult = await callAI("posts", providers, [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: postsPrompt },
+          ], AI_TIMEOUT).catch(() => null);
+
+          if (postsResult) {
+            const postsData = parseJsonResponse<PostsResult>(postsResult.content);
+            if (postsData && postsData.posts.length > 0) {
+              allContent.posts = postsData.posts;
+            }
+          }
+        }
+      } catch { /* fall through to local generator */ }
+    }
+
+    if (allContent.posts.length === 0) {
+      console.log("[pipeline] AI failed or not configured — using local generator");
+      const localResult = generateFullLinkedInResponse(videoInfo);
+      allContent.posts = localResult.posts.map((p) => ({
         hook: p.hook, body: p.body, imagePrompt: p.imagePrompt,
         postType: "story" as const, viralityScore: 70, authorityScore: 65,
         commentPotential: 60, readabilityScore: 70,
-      })),
-      articles: localResult.articles.map((a) => ({
+      }));
+      allContent.articles = localResult.articles.map((a) => ({
         title: a.title, body: a.body, imagePrompts: a.imagePrompts,
-      })),
-    };
+      }));
+    } else if (analysis) {
+      const articlesPrompt = buildArticlesCalendarPrompt(analysis.voice_profile, allContent.posts, analysis.ideas, 2);
+      const articlesResult = await callAI("articles", providers, [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: articlesPrompt },
+      ], AI_TIMEOUT).catch(() => null);
+      if (articlesResult) {
+        const articlesData = parseJsonResponse<ArticlesCalendarResult>(articlesResult.content);
+        if (articlesData?.articles) {
+          allContent.articles = articlesData.articles;
+        }
+      }
+    }
 
-    console.log(`[pipeline] Local generation complete: ${allContent.posts.length} posts, ${allContent.articles.length} articles`);
+    console.log(`[pipeline] Generated: ${allContent.posts.length} posts, ${allContent.articles.length} articles`);
 
     // ═══════════════════════════════════════════════════════════════
     // SAVE & COMPLETE
