@@ -1,3 +1,7 @@
+function getOllamaBaseUrl(): string {
+  return process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+}
+
 export function getProviderBaseUrl(provider: string): string {
   const urls: Record<string, string> = {
     gemini: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
@@ -6,6 +10,7 @@ export function getProviderBaseUrl(provider: string): string {
     cerebras: "https://api.cerebras.ai/v1/chat/completions",
     mistral: "https://api.mistral.ai/v1/chat/completions",
     tokengo: "https://api.tokengo.com/v1/chat/completions",
+    ollama: `${getOllamaBaseUrl()}/v1/chat/completions`,
   };
   return urls[provider] || "";
 }
@@ -18,6 +23,7 @@ export function getProviderApiKey(provider: string): string | undefined {
     cerebras: process.env.CEREBRAS_API_KEY,
     mistral: process.env.MISTRAL_API_KEY,
     tokengo: process.env.THORBASE_API_KEY,
+    ollama: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
   };
   return keys[provider];
 }
@@ -25,8 +31,9 @@ export function getProviderApiKey(provider: string): string | undefined {
 export function getProviderHeaders(provider: string, apiKey: string): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${apiKey}`,
   };
+  if (provider === "ollama") return headers;
+  headers.Authorization = `Bearer ${apiKey}`;
   if (provider === "openrouter") {
     headers["HTTP-Referer"] = "https://link2post.app";
     headers["X-Title"] = "Link2Post";

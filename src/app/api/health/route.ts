@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
 import { getProviderBaseUrl, getProviderApiKey, getProviderHeaders } from "@/services/ai/providers/shared";
+import { checkHealth as checkOllamaHealth, listModels as listOllamaModels } from "@/services/ai/providers/ollama";
 
 const HEALTH_TIMEOUT_MS = 10_000;
 const HEALTH_PROMPT = "Say exactly one word: ok";
@@ -25,6 +26,7 @@ const MODELS_TO_TEST = [
 export async function GET(_req: NextRequest) {
   const results: ModelHealth[] = [];
 
+  // Test external providers
   for (const { provider, model } of MODELS_TO_TEST) {
     const apiKey = getProviderApiKey(provider);
     if (!apiKey) {
@@ -82,6 +84,50 @@ export async function GET(_req: NextRequest) {
       results.push({ provider, model, status: "fail", latencyMs, error });
       console.error(`[health] ${provider}/${model} FAILED: ${error} (${latencyMs}ms)`);
     }
+  }
+
+  // Test Ollama
+  try {
+    const ollamaHealth = await checkOllamaHealth();
+    const ollamaModels = ollamaHealth.models;
+    
+    if (ollamaHealth.running) {
+      // Test primary models if they exist
+      const modelsToTest = [
+        { name: "qwen3:8b", label: "Analysis" },
+        { name: "gemma3:4b", label: "Writing" },
+        { name: "llama3.1:8b", label: "Fast" },
+      ];
+
+      for (const { name, label } of modelsToTest) {
+        const exists = ollamaModels.some(m => m.name === name || m.model === name);
+        if (!exists) {
+          results.push({ provider: "ollama", model: `${name} (${label})`, status: "skip", error: "model not installed" });
+          continue;
+        }
+
+        const start = Date.now();
+        try {
+          const { callOllama } = await import("@/services/ai/providers/ollama");
+          const result = await callOllama(name, [{ role: "user", content: HEALTH_PROMPT }], { maxTokens: 10, timeoutMs: 15_000 });
+          const latencyMs = Date.now() - start;
+          results.push({ provider: "ollama", model: `${name} (${label})`, status: "ok", latencyMs });
+          console.log(`[health] ollama/${name} (${label}) OK (${latencyMs}ms)`);
+        } catch (err: unknown) {
+          const latencyMs = Date.now() - start;
+          const error = err instanceof Error ? err.message : "unknown error";
+          results.push({ provider: "ollama", model: `${name} (${label})`, status: "fail", latencyMs, error });
+          console.error(`[health] ollama/${name} (${label}) FAILED: ${error} (${latencyMs}ms)`);
+        }
+      }
+    } else {
+      results.push({ provider: "ollama", model: "service", status: "fail", error: ollamaHealth.error || "not running" });
+      console.error(`[health] ollama FAILED: ${ollamaHealth.error}`);
+    }
+  } catch (err: unknown) {
+    const error = err instanceof Error ? err.message : "unknown error";
+    results.push({ provider: "ollama", model: "service", status: "fail", error });
+    console.error(`[health] ollama FAILED: ${error}`);
   }
 
   const summary = {

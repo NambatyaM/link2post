@@ -1,11 +1,12 @@
 import { getProviderBaseUrl, getProviderApiKey, getProviderHeaders } from "@/services/ai/providers/shared";
 import type { CallAIResult } from "./types";
 
-export const CALL_TIMEOUT_MS = 8_000;
+export const CALL_TIMEOUT_MS = 60_000;
 
 export function getAvailableProviders(): Array<{ id: string; model: string }> {
   const providers: Array<{ id: string; model: string }> = [];
   const tryProviders = [
+    { id: "ollama", model: "gemma3:4b", envKey: "OLLAMA_BASE_URL" },
     { id: "groq", model: "llama-3.3-70b-versatile", envKey: "GROQ_API_KEY" },
     { id: "gemini", model: "gemini-2.0-flash", envKey: "GEMINI_API_KEY" },
     { id: "openrouter", model: "qwen/qwen-2.5-72b-instruct", envKey: "OPENROUTER_API_KEY" },
@@ -19,7 +20,7 @@ export function getAvailableProviders(): Array<{ id: string; model: string }> {
   return providers;
 }
 
-const JSON_MODE_PROVIDERS = new Set(["groq", "gemini", "mistral"]);
+const JSON_MODE_PROVIDERS = new Set(["groq", "gemini", "mistral", "ollama"]);
 
 async function tryProvider(
   provider: { id: string; model: string },

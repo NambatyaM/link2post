@@ -6,6 +6,7 @@ import { callProvider as openrouterCall, callProviderWithModel as openrouterCall
 import { callProvider as cerebrasCall } from "./providers/cerebras";
 import { callProvider as mistralCall } from "./providers/mistral";
 import { callProvider as tokengoCall, callProviderWithModel as tokengoCallWithModel } from "./providers/tokengo";
+import { callOllama, getModelForTask, getFallbackModel, OLLAMA_MODELS } from "./providers/ollama";
 
 interface RouteEntry {
   provider: string;
@@ -17,163 +18,217 @@ function checkApiKey(envVar: string): boolean {
   return !!process.env[envVar];
 }
 
+function ollamaAvailable(): boolean {
+  try {
+    const baseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+    return !!baseUrl;
+  } catch {
+    return false;
+  }
+}
+
 function buildRouteTable(): Record<TaskType, RouteEntry[]> {
-  return {
-    transcript_processing: [
-      ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
-        ? [{ provider: "gemini", model: "gemini-2.0-flash", call: geminiCall }]
-        : []),
-      ...(checkApiKey("OPENROUTER_API_KEY")
-        ? [{ provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") }]
-        : []),
-      ...(checkApiKey("GROQ_API_KEY")
-        ? [{ provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") }]
-        : []),
-      ...(checkApiKey("CEREBRAS_API_KEY")
-        ? [{ provider: "cerebras", model: "gpt-oss-120b", call: cerebrasCall }]
-        : []),
-      ...(checkApiKey("THORBASE_API_KEY")
-        ? [{ provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") }]
-        : []),
-    ],
-    brand_voice_learning: [
-      ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
-        ? [{ provider: "gemini", model: "gemini-2.0-flash", call: geminiCall }]
-        : []),
-      ...(checkApiKey("OPENROUTER_API_KEY")
-        ? [{ provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") }]
-        : []),
-      ...(checkApiKey("GROQ_API_KEY")
-        ? [{ provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") }]
-        : []),
-      ...(checkApiKey("THORBASE_API_KEY")
-        ? [{ provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") }]
-        : []),
-    ],
-    post_generation: [
-      ...(checkApiKey("GROQ_API_KEY")
-        ? [{ provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") }]
-        : []),
-      ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
-        ? [{ provider: "gemini", model: "gemini-2.0-flash", call: geminiCall }]
-        : []),
-      ...(checkApiKey("OPENROUTER_API_KEY")
-        ? [{ provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") }]
-        : []),
-      ...(checkApiKey("CEREBRAS_API_KEY")
-        ? [{ provider: "cerebras", model: "gpt-oss-120b", call: cerebrasCall }]
-        : []),
-      ...(checkApiKey("THORBASE_API_KEY")
-        ? [
-            { provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") },
-            { provider: "tokengo", model: "deepseek-v4-pro", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-pro") },
-          ]
-        : []),
-    ],
-    article_generation: [
-      ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
-        ? [{ provider: "gemini", model: "gemini-2.0-flash", call: geminiCall }]
-        : []),
-      ...(checkApiKey("OPENROUTER_API_KEY")
-        ? [
-            { provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") },
-            { provider: "openrouter", model: "meta-llama/llama-3.1-70b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "meta-llama/llama-3.1-70b-instruct") },
-          ]
-        : []),
-      ...(checkApiKey("THORBASE_API_KEY")
-        ? [{ provider: "tokengo", model: "deepseek-v4-pro", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-pro") }]
-        : []),
-    ],
-    carousel_generation: [
-      ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
-        ? [{ provider: "gemini", model: "gemini-2.0-flash", call: geminiCall }]
-        : []),
-      ...(checkApiKey("GROQ_API_KEY")
-        ? [{ provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") }]
-        : []),
-      ...(checkApiKey("MISTRAL_API_KEY")
-        ? [{ provider: "mistral", model: "mistral-small-latest", call: mistralCall }]
-        : []),
-      ...(checkApiKey("THORBASE_API_KEY")
-        ? [{ provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") }]
-        : []),
-    ],
-    rewrite_edit: [
-      ...(checkApiKey("GROQ_API_KEY")
-        ? [
-            { provider: "groq", model: "mixtral-8x7b-32768", call: (req: CompletionRequest) => groqCallWithModel(req, "mixtral-8x7b-32768") },
-            { provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") },
-          ]
-        : []),
-      ...(checkApiKey("MISTRAL_API_KEY")
-        ? [{ provider: "mistral", model: "mistral-small-latest", call: mistralCall }]
-        : []),
-      ...(checkApiKey("THORBASE_API_KEY")
-        ? [{ provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") }]
-        : []),
-    ],
-    hook_generation: [
-      ...(checkApiKey("GROQ_API_KEY")
-        ? [
-            { provider: "groq", model: "mixtral-8x7b-32768", call: (req: CompletionRequest) => groqCallWithModel(req, "mixtral-8x7b-32768") },
-            { provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") },
-          ]
-        : []),
-      ...(checkApiKey("MISTRAL_API_KEY")
-        ? [{ provider: "mistral", model: "mistral-small-latest", call: mistralCall }]
-        : []),
-      ...(checkApiKey("THORBASE_API_KEY")
-        ? [{ provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") }]
-        : []),
-    ],
-    content_calendar: [
-      ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
-        ? [{ provider: "gemini", model: "gemini-2.0-flash", call: geminiCall }]
-        : []),
-      ...(checkApiKey("OPENROUTER_API_KEY")
-        ? [{ provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") }]
-        : []),
-      ...(checkApiKey("GROQ_API_KEY")
-        ? [{ provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") }]
-        : []),
-      ...(checkApiKey("THORBASE_API_KEY")
-        ? [{ provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") }]
-        : []),
-    ],
-    transcript_analysis: [
-      ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
-        ? [{ provider: "gemini", model: "gemini-2.0-flash", call: geminiCall }]
-        : []),
-      ...(checkApiKey("GROQ_API_KEY")
-        ? [{ provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") }]
-        : []),
-      ...(checkApiKey("OPENROUTER_API_KEY")
-        ? [{ provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") }]
-        : []),
-    ],
-    posts_generation: [
-      ...(checkApiKey("GROQ_API_KEY")
-        ? [{ provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") }]
-        : []),
-      ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
-        ? [{ provider: "gemini", model: "gemini-2.0-flash", call: geminiCall }]
-        : []),
-      ...(checkApiKey("MISTRAL_API_KEY")
-        ? [{ provider: "mistral", model: "mistral-small-latest", call: mistralCall }]
-        : []),
-    ],
-    articles_calendar_generation: [
-      ...(checkApiKey("GROQ_API_KEY")
-        ? [{ provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") }]
-        : []),
-      ...(checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")
-        ? [{ provider: "gemini", model: "gemini-2.0-flash", call: geminiCall }]
-        : []),
-      ...(checkApiKey("OPENROUTER_API_KEY")
-        ? [{ provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") }]
-        : []),
-    ],
+  const ollamaEnabled = ollamaAvailable();
+  const table: Record<TaskType, RouteEntry[]> = {
+    transcript_processing: [],
+    brand_voice_learning: [],
+    post_generation: [],
+    article_generation: [],
+    carousel_generation: [],
+    rewrite_edit: [],
+    hook_generation: [],
+    content_calendar: [],
+    transcript_analysis: [],
+    posts_generation: [],
+    articles_calendar_generation: [],
   };
+
+  if (ollamaEnabled) {
+    const analysisModel = OLLAMA_MODELS.analysis;
+    const writingModel = OLLAMA_MODELS.writing;
+    const fastModel = OLLAMA_MODELS.fast;
+
+    table.transcript_processing.push(
+      { provider: "ollama", model: analysisModel, call: (req) => callOllama(analysisModel, req.messages, { expectJson: req.expectJson, maxTokens: req.maxTokens, temperature: req.temperature, signal: req.signal }) },
+    );
+    table.brand_voice_learning.push(
+      { provider: "ollama", model: analysisModel, call: (req) => callOllama(analysisModel, req.messages, { expectJson: req.expectJson, maxTokens: req.maxTokens, temperature: req.temperature, signal: req.signal }) },
+    );
+    table.post_generation.push(
+      { provider: "ollama", model: writingModel, call: (req) => callOllama(writingModel, req.messages, { expectJson: req.expectJson, maxTokens: req.maxTokens, temperature: req.temperature, signal: req.signal }) },
+    );
+    table.article_generation.push(
+      { provider: "ollama", model: writingModel, call: (req) => callOllama(writingModel, req.messages, { expectJson: req.expectJson, maxTokens: req.maxTokens, temperature: req.temperature, signal: req.signal }) },
+    );
+    table.carousel_generation.push(
+      { provider: "ollama", model: writingModel, call: (req) => callOllama(writingModel, req.messages, { expectJson: req.expectJson, maxTokens: req.maxTokens, temperature: req.temperature, signal: req.signal }) },
+    );
+    table.rewrite_edit.push(
+      { provider: "ollama", model: fastModel, call: (req) => callOllama(fastModel, req.messages, { expectJson: req.expectJson, maxTokens: req.maxTokens, temperature: req.temperature, signal: req.signal }) },
+    );
+    table.hook_generation.push(
+      { provider: "ollama", model: fastModel, call: (req) => callOllama(fastModel, req.messages, { expectJson: req.expectJson, maxTokens: req.maxTokens, temperature: req.temperature, signal: req.signal }) },
+    );
+    table.content_calendar.push(
+      { provider: "ollama", model: analysisModel, call: (req) => callOllama(analysisModel, req.messages, { expectJson: req.expectJson, maxTokens: req.maxTokens, temperature: req.temperature, signal: req.signal }) },
+    );
+    table.transcript_analysis.push(
+      { provider: "ollama", model: analysisModel, call: (req) => callOllama(analysisModel, req.messages, { expectJson: req.expectJson, maxTokens: req.maxTokens, temperature: req.temperature, signal: req.signal }) },
+    );
+    table.posts_generation.push(
+      { provider: "ollama", model: writingModel, call: (req) => callOllama(writingModel, req.messages, { expectJson: req.expectJson, maxTokens: req.maxTokens, temperature: req.temperature, signal: req.signal }) },
+    );
+    table.articles_calendar_generation.push(
+      { provider: "ollama", model: writingModel, call: (req) => callOllama(writingModel, req.messages, { expectJson: req.expectJson, maxTokens: req.maxTokens, temperature: req.temperature, signal: req.signal }) },
+    );
+  }
+
+  if (checkApiKey("GEMINI_API_KEY") || checkApiKey("GOOGLE_AI_STUDIO_API_KEY")) {
+    table.transcript_processing.push(
+      { provider: "gemini", model: "gemini-2.0-flash", call: geminiCall },
+    );
+    table.brand_voice_learning.push(
+      { provider: "gemini", model: "gemini-2.0-flash", call: geminiCall },
+    );
+    table.post_generation.push(
+      { provider: "gemini", model: "gemini-2.0-flash", call: geminiCall },
+    );
+    table.article_generation.push(
+      { provider: "gemini", model: "gemini-2.0-flash", call: geminiCall },
+    );
+    table.carousel_generation.push(
+      { provider: "gemini", model: "gemini-2.0-flash", call: geminiCall },
+    );
+    table.content_calendar.push(
+      { provider: "gemini", model: "gemini-2.0-flash", call: geminiCall },
+    );
+    table.transcript_analysis.push(
+      { provider: "gemini", model: "gemini-2.0-flash", call: geminiCall },
+    );
+  }
+
+  if (checkApiKey("OPENROUTER_API_KEY")) {
+    table.transcript_processing.push(
+      { provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") },
+    );
+    table.brand_voice_learning.push(
+      { provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") },
+    );
+    table.post_generation.push(
+      { provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") },
+    );
+    table.article_generation.push(
+      { provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") },
+      { provider: "openrouter", model: "meta-llama/llama-3.1-70b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "meta-llama/llama-3.1-70b-instruct") },
+    );
+    table.carousel_generation.push(
+      { provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") },
+    );
+    table.content_calendar.push(
+      { provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") },
+    );
+    table.transcript_analysis.push(
+      { provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") },
+    );
+    table.posts_generation.push(
+      { provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") },
+    );
+    table.articles_calendar_generation.push(
+      { provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") },
+    );
+  }
+
+  if (checkApiKey("GROQ_API_KEY")) {
+    table.transcript_processing.push(
+      { provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") },
+    );
+    table.brand_voice_learning.push(
+      { provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") },
+    );
+    table.post_generation.push(
+      { provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") },
+    );
+    table.carousel_generation.push(
+      { provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") },
+    );
+    table.rewrite_edit.push(
+      { provider: "groq", model: "mixtral-8x7b-32768", call: (req: CompletionRequest) => groqCallWithModel(req, "mixtral-8x7b-32768") },
+      { provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") },
+    );
+    table.hook_generation.push(
+      { provider: "groq", model: "mixtral-8x7b-32768", call: (req: CompletionRequest) => groqCallWithModel(req, "mixtral-8x7b-32768") },
+      { provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") },
+    );
+    table.content_calendar.push(
+      { provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") },
+    );
+    table.transcript_analysis.push(
+      { provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") },
+    );
+    table.posts_generation.push(
+      { provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") },
+    );
+    table.articles_calendar_generation.push(
+      { provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") },
+    );
+  }
+
+  if (checkApiKey("CEREBRAS_API_KEY")) {
+    table.post_generation.push(
+      { provider: "cerebras", model: "gpt-oss-120b", call: cerebrasCall },
+    );
+    table.carousel_generation.push(
+      { provider: "cerebras", model: "gpt-oss-120b", call: cerebrasCall },
+    );
+    table.posts_generation.push(
+      { provider: "cerebras", model: "gpt-oss-120b", call: cerebrasCall },
+    );
+  }
+
+  if (checkApiKey("MISTRAL_API_KEY")) {
+    table.carousel_generation.push(
+      { provider: "mistral", model: "mistral-small-latest", call: mistralCall },
+    );
+    table.rewrite_edit.push(
+      { provider: "mistral", model: "mistral-small-latest", call: mistralCall },
+    );
+    table.hook_generation.push(
+      { provider: "mistral", model: "mistral-small-latest", call: mistralCall },
+    );
+    table.posts_generation.push(
+      { provider: "mistral", model: "mistral-small-latest", call: mistralCall },
+    );
+  }
+
+  if (checkApiKey("THORBASE_API_KEY")) {
+    table.transcript_processing.push(
+      { provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") },
+    );
+    table.brand_voice_learning.push(
+      { provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") },
+    );
+    table.post_generation.push(
+      { provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") },
+      { provider: "tokengo", model: "deepseek-v4-pro", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-pro") },
+    );
+    table.carousel_generation.push(
+      { provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") },
+    );
+    table.content_calendar.push(
+      { provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") },
+    );
+    table.transcript_analysis.push(
+      { provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") },
+    );
+    table.posts_generation.push(
+      { provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") },
+    );
+    table.articles_calendar_generation.push(
+      { provider: "tokengo", model: "deepseek-v4-pro", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-pro") },
+    );
+  }
+
+  return table;
 }
 
 function shouldExpectJson(taskType: TaskType): boolean {
@@ -220,7 +275,14 @@ function getMaxTokens(taskType: TaskType): number {
   }
 }
 
-const FAST_RACE_MS = 10_000;
+function getOllamaFallbackModel(taskType: TaskType): string {
+  const analysisTasks: TaskType[] = ["transcript_processing", "brand_voice_learning", "transcript_analysis"];
+  const writingTasks: TaskType[] = ["post_generation", "article_generation", "carousel_generation", "posts_generation", "articles_calendar_generation"];
+  
+  if (analysisTasks.includes(taskType)) return OLLAMA_MODELS.analysis;
+  if (writingTasks.includes(taskType)) return OLLAMA_MODELS.writing;
+  return OLLAMA_MODELS.fast;
+}
 
 export function getRouteForTask(taskType: TaskType): RouteEntry[] {
   const table = buildRouteTable();
@@ -253,8 +315,6 @@ export async function routeTask(
     expectJson,
   };
 
-  const groqRoutes = routes.filter((r) => r.provider === "groq");
-  const fastFallback = groqRoutes.length > 0 ? groqRoutes[0] : null;
   const raceAbort = new AbortController();
 
   function validateResult(result: { content: string; latencyMs: number }, route: RouteEntry): RouteResult | null {
@@ -285,44 +345,42 @@ export async function routeTask(
         ? (err as { statusCode: number }).statusCode
         : undefined;
       console.warn(`[model-router] ${route.provider}/${route.model} failed: ${err instanceof Error ? err.message : String(err)}`);
+      
+      // If Ollama model is not found, try fallback model
+      if (route.provider === "ollama" && err instanceof Error && (err.message.includes("not found") || err.message.includes("404") || err.message.includes("model not found"))) {
+        const fallbackModel = getOllamaFallbackModel(taskType);
+        if (fallbackModel !== route.model) {
+          console.log(`[model-router] Ollama model ${route.model} not found, trying fallback: ${fallbackModel}`);
+          try {
+            const { callOllama } = await import("./providers/ollama");
+            const fallbackResult = await callOllama(fallbackModel, messages, { expectJson, maxTokens, temperature: 0.7, signal: raceAbort.signal });
+            return validateResult(fallbackResult, { ...route, model: fallbackModel });
+          } catch (fallbackErr) {
+            console.warn(`[model-router] Fallback model ${fallbackModel} also failed: ${fallbackErr instanceof Error ? fallbackErr.message : String(fallbackErr)}`);
+          }
+        }
+      }
       return null;
     }
   }
 
   const firstRoute = routes[0];
   const requestWithSignal = { ...request, signal: raceAbort.signal };
-  const firstResultPromise = tryRoute(firstRoute);
 
-  if (fastFallback && fastFallback !== firstRoute) {
-    const raceResult = await Promise.race([
-      firstResultPromise.then((r) => ({ route: firstRoute, result: r })),
-      new Promise<{ route: RouteEntry; result: null }>((resolve) =>
-        setTimeout(() => resolve({ route: fastFallback, result: null }), FAST_RACE_MS)
-      ),
-      fastFallback.call(requestWithSignal).then((r) => {
-        const validated = validateResult(r, fastFallback);
-        return { route: fastFallback, result: validated };
-      }).catch(() => ({ route: fastFallback, result: null })),
-    ]);
-
-    raceAbort.abort();
-
-    if (raceResult.result) {
-      console.log(`[model-router] Race winner: ${raceResult.route.provider}/${raceResult.route.model}`);
-      return raceResult.result;
+  // If first route is Ollama, try it first (no race) — it's the primary provider
+  if (firstRoute.provider === "ollama") {
+    console.log(`[model-router] Ollama is primary for ${taskType}, trying first...`);
+    const ollamaResult = await tryRoute(firstRoute);
+    if (ollamaResult) {
+      raceAbort.abort();
+      return ollamaResult;
     }
-
-    const firstResult = await firstResultPromise;
-    if (firstResult) {
-      console.log(`[model-router] First route completed: ${firstRoute.provider}/${firstRoute.model}`);
-      return firstResult;
-    }
-  } else {
-    const firstResult = await firstResultPromise;
-    if (firstResult) return firstResult;
+    console.log(`[model-router] Ollama failed for ${taskType}, falling back to cloud providers...`);
+    // Fall through to try remaining cloud providers below
   }
 
-  for (const route of routes.slice(1)) {
+  // For non-Ollama first routes, or after Ollama fails: try remaining routes
+  for (const route of routes.slice(firstRoute.provider === "ollama" ? 1 : 0)) {
     const result = await tryRoute(route);
     if (result) return result;
   }
