@@ -9,7 +9,7 @@ export function getAvailableProviders(): Array<{ id: string; model: string }> {
     { id: "groq", model: "llama-3.3-70b-versatile", envKey: "GROQ_API_KEY" },
     { id: "gemini", model: "gemini-2.0-flash", envKey: "GEMINI_API_KEY" },
     { id: "openrouter", model: "qwen/qwen-2.5-72b-instruct", envKey: "OPENROUTER_API_KEY" },
-    { id: "cerebras", model: "llama-3.3-70b", envKey: "CEREBRAS_API_KEY" },
+    { id: "cerebras", model: "gpt-oss-120b", envKey: "CEREBRAS_API_KEY" },
     { id: "mistral", model: "mistral-small-latest", envKey: "MISTRAL_API_KEY" },
     { id: "tokengo", model: "deepseek-v4-flash", envKey: "THORBASE_API_KEY" },
   ];
@@ -18,6 +18,8 @@ export function getAvailableProviders(): Array<{ id: string; model: string }> {
   }
   return providers;
 }
+
+const JSON_MODE_PROVIDERS = new Set(["groq", "gemini", "mistral"]);
 
 async function tryProvider(
   provider: { id: string; model: string },
@@ -32,15 +34,20 @@ async function tryProvider(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CALL_TIMEOUT_MS);
 
+  const body: Record<string, unknown> = {
+    model: provider.model,
+    messages,
+    temperature: 0.7,
+    max_tokens: maxTokens,
+  };
+  if (JSON_MODE_PROVIDERS.has(provider.id)) {
+    body.response_format = { type: "json_object" };
+  }
+
   const response = await fetch(baseUrl, {
     method: "POST",
     headers: getProviderHeaders(provider.id, apiKey),
-    body: JSON.stringify({
-      model: provider.model,
-      messages,
-      temperature: 0.7,
-      max_tokens: maxTokens,
-    }),
+    body: JSON.stringify(body),
     signal: controller.signal,
   });
 
@@ -67,6 +74,8 @@ export async function callAI(
   maxTokens: number,
 ): Promise<CallAIResult> {
   const errors: string[] = [];
+
+  console.log(`[pipeline:${taskLabel}] Trying ${providers.length} providers in parallel: ${providers.map(p => p.id).join(", ")}`);
 
   const raceMap = new Map(
     providers.map((p) => [
