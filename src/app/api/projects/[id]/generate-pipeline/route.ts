@@ -96,7 +96,10 @@ export async function POST(
           if (postsResult) {
             const postsData = parseJsonResponse<PostsResult>(postsResult.content);
             if (postsData && postsData.posts.length > 0) {
-              allContent.posts = postsData.posts;
+              const validPosts = postsData.posts.filter(p => p.body.length >= 800);
+              if (validPosts.length >= 3) {
+                allContent.posts = validPosts;
+              }
             }
           }
         }

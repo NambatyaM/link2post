@@ -71,9 +71,9 @@ export const POSTS_PROMPT = `You are an expert LinkedIn post writer. Generate po
 1. Generate exactly {post_count} posts, each from a DIFFERENT idea.
 2. Each post type must match its suggestedType from the ideas.
 3. Hook: under 10 words. Data point, contrarian statement, or sharp question. No generic openers.
-4. Body: 1-2 sentence paragraphs. Short. Punchy. Include ONE specific detail from the idea.
+4. Body: 1-2 sentence paragraphs. Develop a full narrative arc — setup, tension/pivot, result, lesson. Do NOT skip steps.
 5. Closing: end on the point or a genuine specific question. No generic "Thoughts?"
-6. Length: 1,000-1,300 characters total per post.
+6. Length: MUST BE 1,000-1,300 characters total per post. Count your output. Below 1,000 is unacceptable.
 7. No hashtags. No external links. No engagement bait.
 8. No emojis unless voice profile includes them.
 9. First person voice. Never reference "the video" or "the podcast".
@@ -84,7 +84,7 @@ Return ONLY valid JSON:
   "posts": [
     {
       "hook": "Line 1-2 that stops the scroll",
-      "body": "Full post body. 1,000-1,300 characters. Short paragraphs.",
+      "body": "Full post body. MUST BE 1,000-1,300 characters. Short paragraphs. Full narrative arc.",
       "imagePrompt": "Specific visual prompt. No text in image. --ar 16:9",
       "postType": "story | educational | framework | listicle | case_study",
       "viralityScore": 8,
@@ -393,28 +393,28 @@ Select the top ideas for different content types:
 Generate content in the following types, using the selected ideas and voice profile:
 
 **Story Posts** (2-3 posts):
-- Hook under 10 words
-- Short paragraphs, max 2 sentences each
-- Clear narrative arc: setup → tension → resolution
-- End with a specific question or strong statement
+- Hook under 10 words — specific data point, sharp question, or contrarian claim
+- Full narrative arc: setup → tension/pivot → result → lesson. Never skip steps.
+- Include at least 2-3 specific data points, numbers, named examples, or quotes from the transcript
+- End with a specific question or strong statement — never generic
 - No hashtags, no emojis (unless in voice profile)
-- 1,000-1,300 characters total
-- Include one image prompt per post
+- LENGTH: 1,000-1,300 characters. Below 1,000 is unacceptable — expand the narrative with more specific detail.
+- Include one specific image prompt per post
 
 **Framework Posts** (1-2 posts):
 - Present a clear system, method, or step-by-step approach
-- Use numbered lists or bullet structure
-- Each step should have a concrete example
+- Each step backed by a SPECIFIC example from the transcript
+- Use numbered steps or bullet structure — never abstract advice
 
 **Listicle Posts** (1-2 posts):
-- 5-7 items, each with a specific detail from the transcript
-- Each item stands on its own
-- Strong opening hook and closing CTA
+- 5-7 items, each with a concrete detail, number, or example from the transcript
+- Each item stands alone and is specific enough to screenshot
+- Strong opening hook and closing question
 
 **Case Study / Data Posts** (1 post):
-- Lead with a specific number or outcome
-- Tell the story behind the data
-- End with the lesson learned
+- Lead with a specific number or outcome from the transcript
+- Tell the full story: what they tried, what happened, what they learned
+- End with the lesson — not a generic one, the specific lesson from this data
 
 **LinkedIn Articles** (1-2 articles):
 - Title: specific and outcome-oriented
@@ -532,6 +532,10 @@ Before you output, verify every post and article against these criteria:
 6. **Banned pattern scan**: Scan every sentence for the banned patterns list. If any match, rewrite from scratch.
 
 7. **Concrete over abstract**: Replace every abstract noun (growth, success, transformation, impact, value, insight) with a specific thing, number, or outcome. If you can't, delete the sentence.
+
+8. **Character count**: Every post MUST be 1,000-1,300 characters. If below 1,000, add more specific detail, narrative depth, or additional examples until you hit the target.
+
+9. **Three-detail minimum**: Every post must include at least three specific, falsifiable details from the transcript (numbers, names, percentages, dollar amounts, dates, named examples). Count them. If you have fewer than three, rewrite.
 
 Return ONLY valid JSON matching the structure above.`;
 
@@ -736,13 +740,14 @@ STEP 3 — CONTENT GENERATION (generate 4-6 posts and 1-2 articles):
 POSTS (4-6 total, mix of types):
 For each post, pick a different moment and assign a post type. Follow these rules:
 - Hook: data point, contrarian statement, or sharp question. Under 10 words. No generic openers.
-- Body: 1-2 sentence paragraphs. One narrative arc. Include ONE specific detail from the moment.
+- Body: 1-2 sentence paragraphs. Full narrative arc — setup, tension/pivot, result, lesson. Include at least 3 specific data points, numbers, named examples, or quotes from the transcript per post.
 - Closing: end on the point, or a genuine specific question. No generic "Thoughts?" or "Agree?"
-- Length: 1,000-1,300 characters total (not words).
+- Length: MUST BE 1,000-1,300 characters. Below 1,000 is unacceptable — expand with more specific detail and narrative depth.
 - Hashtags: 0. No hashtags at all.
 - No external links. No engagement bait. First person voice.
 - One specific image prompt tied to the post's concrete detail.
 - No emojis unless the voice profile explicitly includes them.
+- Count your characters before outputting. If under 1,000, add more specific examples.
 
 ARTICLES (1-2 total):
 Each article weaves 2-3 related moments into one throughline:

@@ -22,7 +22,7 @@ describe("prompts", () => {
     expect(SYSTEM_PROMPT).toContain("1,000-1,300 characters");
     expect(SYSTEM_PROMPT).toContain("No hashtags, no emojis");
     expect(SYSTEM_PROMPT).toContain("Hook under 10 words");
-    expect(SYSTEM_PROMPT).toContain("max 2 sentences each");
+    expect(SYSTEM_PROMPT).toContain("Full narrative arc");
   });
 
   it("SYSTEM_PROMPT contains article constraints", () => {
