@@ -52,6 +52,7 @@ export default function NewProjectPage() {
     try {
       const supabase = getSupabaseBrowser();
       const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) throw new Error("Not authenticated");
 
       let inputText = transcript.trim();
 
@@ -59,7 +60,7 @@ export default function NewProjectPage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          Authorization: `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           title: title.trim() || "Untitled Project",
@@ -75,8 +76,25 @@ export default function NewProjectPage() {
         throw new Error(errData.error || "Failed to create project");
       }
 
-      const data = await res.json();
-      router.push(`/projects/${data.project.id}`);
+      const { project } = await res.json();
+
+      const voiceProfilePrompt = localStorage.getItem("link2post_voice_prompt") || "";
+
+      const genRes = await fetch(`/api/projects/${project.id}/generate-pipeline`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ voiceProfilePrompt }),
+      });
+
+      if (!genRes.ok) {
+        const errData = await genRes.json().catch(() => ({}));
+        throw new Error(errData.error || "Generation failed");
+      }
+
+      router.push(`/projects/${project.id}`);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {

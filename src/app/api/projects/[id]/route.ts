@@ -94,7 +94,7 @@ export async function PATCH(
       posts?: Array<{ hook: string; body: string; imagePrompt: string; viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number; status?: string }>;
     };
 
-    const supabase = getSupabaseServer(req);
+    const supabase = getSupabaseServer(req, token);
 
     const { data: project } = await supabase
       .from("projects")

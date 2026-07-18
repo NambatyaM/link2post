@@ -66,132 +66,22 @@ export async function POST(
 
     await supabase.from("projects").update({ status: "processing" }).eq("id", projectId).eq("user_id", userId);
 
-    const providers = getAvailableProviders();
-    if (providers.length === 0) {
-      return Response.json({ error: "No AI providers configured. Add GEMINI_API_KEY or GROQ_API_KEY to Vercel env vars." }, { status: 503 });
-    }
-
-    console.log(`[pipeline] Starting for project ${projectId}, providers: ${providers.map((p) => p.id).join(", ")}`);
-
     const videoInfo: VideoInfo = { title: project.title, description: "", transcript: project.raw_transcript, url: "", videoId: "" };
-    const allContent = { posts: [] as PostsResult["posts"], articles: [] as ArticlesCalendarResult["articles"] };
 
-    const systemPrompt = voiceProfilePrompt
-      ? `${voiceProfilePrompt}\n\n---\n\n${SYSTEM_PROMPT}`
-      : SYSTEM_PROMPT;
+    const localResult = generateFullLinkedInResponse(videoInfo);
 
-    // ═══════════════════════════════════════════════════════════════
-    // CALL 1: Analysis (with local fallback on total AI failure)
-    // ═══════════════════════════════════════════════════════════════
-    console.log("[pipeline] Call 1: Analysis starting");
-    const analysisPrompt = buildAnalysisPrompt(videoInfo);
-    let analysisResult: { content: string; provider: string; model: string; latencyMs: number };
-    let analysis: AnalysisResult | null;
-    let usedLocalFallback = false;
+    const allContent = {
+      posts: localResult.posts.map((p) => ({
+        hook: p.hook, body: p.body, imagePrompt: p.imagePrompt,
+        postType: "story" as const, viralityScore: 70, authorityScore: 65,
+        commentPotential: 60, readabilityScore: 70,
+      })),
+      articles: localResult.articles.map((a) => ({
+        title: a.title, body: a.body, imagePrompts: a.imagePrompts,
+      })),
+    };
 
-    try {
-      analysisResult = await callAI("analysis", providers, [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: analysisPrompt },
-      ], 6000);
-
-      analysis = parseJsonResponse<AnalysisResult>(analysisResult.content);
-      if (!analysis || !analysis.ideas) {
-        throw new Error("Failed to parse analysis response");
-      }
-      console.log(`[pipeline] Call 1 done: ${analysisResult.provider}/${analysisResult.model} in ${analysisResult.latencyMs}ms, ${analysis.ideas.length} ideas`);
-    } catch (analysisError) {
-      console.warn("[pipeline] All AI providers failed for analysis, falling back to local generator:", analysisError);
-      const localResult = generateFullLinkedInResponse(videoInfo);
-      analysis = {
-        cleaned_transcript: videoInfo.transcript,
-        voice_profile: {},
-        ideas: localResult.posts.map((p, i) => ({
-          title: p.hook.slice(0, 60),
-          insight: p.body.slice(0, 200),
-          quote: "",
-          viralityScore: 70 + (i * 3) % 20,
-          authorityScore: 65 + (i * 5) % 25,
-          commentPotential: 60 + (i * 4) % 25,
-          suggestedType: "story" as const,
-        })),
-      };
-      analysisResult = { content: "", provider: "local", model: "fallback", latencyMs: 0 };
-      usedLocalFallback = true;
-      allContent.posts = localResult.posts.map((p) => ({
-        hook: p.hook,
-        body: p.body,
-        imagePrompt: p.imagePrompt,
-        postType: "story",
-        viralityScore: 70,
-        authorityScore: 65,
-        commentPotential: 60,
-        readabilityScore: 70,
-      }));
-      allContent.articles = localResult.articles.map((a) => ({
-        title: a.title,
-        body: a.body,
-        imagePrompts: a.imagePrompts,
-      }));
-    }
-
-    // ═══════════════════════════════════════════════════════════════
-    // CALLS 2 & 3: Posts + Articles/Calendar (PARALLEL, skip if local fallback already provided content)
-    // ═══════════════════════════════════════════════════════════════
-    console.log("[pipeline] Calls 2 & 3: Parallel");
-
-    if (usedLocalFallback) {
-      console.log("[pipeline] Skipping AI Calls 2 & 3 — using local fallback content");
-    } else {
-      const postsPrompt = buildPostsPrompt(analysis.voice_profile, analysis.ideas, 5);
-      const articlesPrompt = buildArticlesCalendarPrompt(analysis.voice_profile, [], analysis.ideas, 2);
-
-      const postsMessages = [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: postsPrompt },
-      ];
-      const articlesMessages = [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: articlesPrompt },
-      ];
-
-      const [postsResult, articlesResult] = await Promise.all([
-        callAI("posts", providers, postsMessages, 6000).catch((e) => { console.error("[pipeline] Posts failed:", e.message); return null; }),
-        callAI("articles", providers, articlesMessages, 8000).catch((e) => { console.error("[pipeline] Articles failed:", e.message); return null; }),
-      ]);
-
-      if (postsResult) {
-        const postsData = parseJsonResponse<PostsResult>(postsResult.content);
-        if (postsData?.posts) {
-          allContent.posts = postsData.posts;
-          console.log(`[pipeline] Call 2 done: ${postsResult.provider}/${postsResult.model} in ${postsResult.latencyMs}ms, ${postsData.posts.length} posts`);
-        }
-      }
-
-      if (articlesResult) {
-        const articlesData = parseJsonResponse<ArticlesCalendarResult>(articlesResult.content);
-        if (articlesData) {
-          allContent.articles = articlesData.articles || [];
-          console.log(`[pipeline] Call 3 done: ${articlesResult.provider}/${articlesResult.model} in ${articlesResult.latencyMs}ms`);
-        }
-      }
-
-      // Fallback: if posts are empty but we have analysis data, supplement with local generator
-      if (allContent.posts.length === 0) {
-        console.warn("[pipeline] No posts from AI, using local generator fallback");
-        const localResult = generateFullLinkedInResponse(videoInfo);
-        allContent.posts = localResult.posts.map((p) => ({
-          hook: p.hook, body: p.body, imagePrompt: p.imagePrompt,
-          postType: "story", viralityScore: 70, authorityScore: 65,
-          commentPotential: 60, readabilityScore: 70,
-        }));
-        if (allContent.articles.length === 0) {
-          allContent.articles = localResult.articles.map((a) => ({
-            title: a.title, body: a.body, imagePrompts: a.imagePrompts,
-          }));
-        }
-      }
-    }
+    console.log(`[pipeline] Local generation complete: ${allContent.posts.length} posts, ${allContent.articles.length} articles`);
 
     // ═══════════════════════════════════════════════════════════════
     // SAVE & COMPLETE
