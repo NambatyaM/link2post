@@ -45,7 +45,7 @@ export async function POST(
     if (!parsedBody.success) {
       return Response.json({ error: "Invalid request body", detail: parsedBody.error.flatten() }, { status: 400 });
     }
-    const { voiceProfilePrompt } = parsedBody.data;
+    const { voiceProfilePrompt, variation } = parsedBody.data;
 
     const supabase = getSupabaseServer(req, token);
     const { data: project, error: fetchError } = await supabase
@@ -71,9 +71,12 @@ export async function POST(
     const videoInfo: VideoInfo = { title: project.title, description: "", transcript: project.raw_transcript, url: "", videoId: "" };
     const allContent = { posts: [] as PostsResult["posts"], articles: [] as ArticlesCalendarResult["articles"] };
     const providers = getAvailableProviders();
+    const variationDirective = variation
+      ? `\n\n---VARIATION SEED: ${variation}---\nIMPORTANT: Generate completely fresh content. Take a different angle than usual. If the source has multiple insights, pick different ones than last time. Change the hook style, narrative structure, and post type mix. This is a regeneration — do NOT produce the same content as before.\n`
+      : "";
     const systemPrompt = voiceProfilePrompt
-      ? `${voiceProfilePrompt}\n\n---\n\n${SYSTEM_PROMPT}`
-      : SYSTEM_PROMPT;
+      ? `${voiceProfilePrompt}\n\n---\n\n${SYSTEM_PROMPT}${variationDirective}`
+      : `${SYSTEM_PROMPT}${variationDirective}`;
 
     let analysis: AnalysisResult | null = null;
 

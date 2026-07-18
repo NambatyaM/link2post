@@ -7,6 +7,7 @@ export const GeneratePipelineParamsSchema = z.object({
 export const GeneratePipelineBodySchema = z.object({
   audience: z.string().optional(),
   voiceProfilePrompt: z.string().optional(),
+  variation: z.string().optional(),
 });
 
 export type GeneratePipelineParams = z.infer<typeof GeneratePipelineParamsSchema>;

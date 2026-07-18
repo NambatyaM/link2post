@@ -187,6 +187,8 @@ function ProjectContent({ projectId }: { projectId: string }) {
 
       setGenerateProgress("Analyzing transcript...");
 
+      const variation = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
       const response = await fetch(`/api/projects/${projectId}/generate-pipeline`, {
         method: "POST",
         headers: {
@@ -196,6 +198,7 @@ function ProjectContent({ projectId }: { projectId: string }) {
         body: JSON.stringify({
           audience: project.audience || undefined,
           voiceProfilePrompt,
+          variation,
         }),
       });
 
