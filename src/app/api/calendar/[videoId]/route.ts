@@ -13,7 +13,7 @@ export async function GET(
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const { videoId } = await params;
-    const supabase = getSupabaseServer(req);
+    const supabase = getSupabaseServer(req, token);
 
     const { data: video, error: videoError } = await supabase
       .from("videos")

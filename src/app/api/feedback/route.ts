@@ -1,10 +1,13 @@
 import { NextRequest } from "next/server";
-import { authenticateRequest, unauthorized } from "@/lib/with-auth";
+import { extractBearerToken, verifyToken } from "@/lib/auth";
+import { unauthorized } from "@/lib/with-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await authenticateRequest(req);
+    const token = extractBearerToken(req);
+    if (!token) return unauthorized();
+    const user = await verifyToken(token);
     if (!user) return unauthorized();
 
     const { postId, rating } = await req.json() as { postId?: string; rating?: "up" | "down" };
@@ -13,7 +16,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "postId and rating are required" }, { status: 400 });
     }
 
-    const supabase = getSupabaseServer(req);
+    const supabase = getSupabaseServer(req, token);
     const { error } = await supabase.from("post_feedback").upsert({
       post_id: postId,
       user_id: user.userId,

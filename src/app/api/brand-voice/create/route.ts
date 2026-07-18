@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
 
     if (userId && hasRealData) {
       try {
-        const supabase = getSupabaseServer(req);
+        const supabase = getSupabaseServer(req, token ?? undefined);
         const { data: existing } = await supabase
           .from("brand_voice_profiles")
           .select("content_sources")

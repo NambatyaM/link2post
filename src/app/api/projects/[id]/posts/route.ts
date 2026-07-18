@@ -24,7 +24,7 @@ export async function PUT(
       return Response.json({ error: "postId is required" }, { status: 400 });
     }
 
-    const supabase = getSupabaseServer(req);
+    const supabase = getSupabaseServer(req, token);
 
     const updates: Record<string, unknown> = {};
     if (content !== undefined) updates.content = content;

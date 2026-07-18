@@ -27,7 +27,7 @@ export async function POST(
       voiceProfilePrompt?: string;
     };
 
-    const supabase = getSupabaseServer(req);
+    const supabase = getSupabaseServer(req, token);
 
     const { data: project, error: fetchError } = await supabase
       .from("projects")

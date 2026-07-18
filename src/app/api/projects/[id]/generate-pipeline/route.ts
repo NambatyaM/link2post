@@ -1,5 +1,6 @@
 import { NextRequest } from "next/server";
-import { authenticateRequest, unauthorized } from "@/lib/with-auth";
+import { extractBearerToken, verifyToken } from "@/lib/auth";
+import { unauthorized } from "@/lib/with-auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import {
   SYSTEM_PROMPT,
@@ -24,7 +25,9 @@ export async function POST(
   let projectId = "";
   let userId = "";
   try {
-    const user = await authenticateRequest(req);
+    const token = extractBearerToken(req);
+    if (!token) return unauthorized();
+    const user = await verifyToken(token);
     if (!user) return unauthorized();
     userId = user.userId;
 
@@ -42,7 +45,7 @@ export async function POST(
     }
     const { voiceProfilePrompt } = parsedBody.data;
 
-    const supabase = getSupabaseServer(req);
+    const supabase = getSupabaseServer(req, token);
     const { data: project, error: fetchError } = await supabase
       .from("projects").select("id, title, raw_transcript, status")
       .eq("id", projectId).eq("user_id", userId).single();

@@ -13,7 +13,7 @@ export async function GET(
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const { id } = await params;
-    const supabase = getSupabaseServer(req);
+    const supabase = getSupabaseServer(req, token);
 
     const { data: project, error: projectError } = await supabase
       .from("projects")
@@ -159,7 +159,7 @@ export async function DELETE(
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
     const { id: projectId } = await params;
-    const supabase = getSupabaseServer(req);
+    const supabase = getSupabaseServer(req, token);
 
     const { data: project } = await supabase
       .from("projects")

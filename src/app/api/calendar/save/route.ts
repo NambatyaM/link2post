@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
       result: LinkedInResult;
     };
 
-    const supabase = getSupabaseServer(req);
+    const supabase = getSupabaseServer(req, token);
 
     const { data: video, error: videoError } = await supabase
       .from("videos")

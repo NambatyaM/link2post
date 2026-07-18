@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "Invalid referral code" }, { status: 400 });
     }
 
-    const supabase = getSupabaseServer(req);
+    const supabase = getSupabaseServer(req, token);
 
     const { data: codeRow } = await supabase
       .from("referral_codes")

@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     const user = await verifyToken(token);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-    const supabase = getSupabaseServer(req);
+    const supabase = getSupabaseServer(req, token);
 
     const { data: profile } = await supabase
       .from("user_profiles")
@@ -61,7 +61,7 @@ export async function PATCH(req: NextRequest) {
       linkedinUrl?: string;
     };
 
-    const supabase = getSupabaseServer(req);
+    const supabase = getSupabaseServer(req, token);
 
     const { error } = await supabase
       .from("user_profiles")
