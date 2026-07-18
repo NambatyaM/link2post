@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
       { id: "gemini", envKey: "GEMINI_API_KEY", model: "gemini-2.0-flash" },
       { id: "groq", envKey: "GROQ_API_KEY", model: "llama-3.3-70b-versatile" },
       { id: "openrouter", envKey: "OPENROUTER_API_KEY", model: "qwen/qwen-2.5-72b-instruct" },
-      { id: "cerebras", envKey: "CEREBRAS_API_KEY", model: "llama-3.3-70b" },
+      { id: "cerebras", envKey: "CEREBRAS_API_KEY", model: "gpt-oss-120b" },
       { id: "mistral", envKey: "MISTRAL_API_KEY", model: "mistral-small-latest" },
       { id: "tokengo", envKey: "THORBASE_API_KEY", model: "deepseek-v4-flash" },
     ];

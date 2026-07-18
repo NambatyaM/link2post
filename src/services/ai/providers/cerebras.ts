@@ -20,7 +20,7 @@ export async function callProvider(
   request: CompletionRequest,
 ): Promise<{ content: string; latencyMs: number }> {
   const apiKey = getApiKey("CEREBRAS_API_KEY");
-  const model = "llama-3.3-70b";
+  const model = "gpt-oss-120b";
   const url = "https://api.cerebras.ai/v1/chat/completions";
 
   const start = Date.now();

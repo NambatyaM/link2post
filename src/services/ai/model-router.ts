@@ -30,7 +30,7 @@ function buildRouteTable(): Record<TaskType, RouteEntry[]> {
         ? [{ provider: "groq", model: "llama-3.3-70b-versatile", call: (req: CompletionRequest) => groqCallWithModel(req, "llama-3.3-70b-versatile") }]
         : []),
       ...(checkApiKey("CEREBRAS_API_KEY")
-        ? [{ provider: "cerebras", model: "llama-3.3-70b", call: cerebrasCall }]
+        ? [{ provider: "cerebras", model: "gpt-oss-120b", call: cerebrasCall }]
         : []),
       ...(checkApiKey("THORBASE_API_KEY")
         ? [{ provider: "tokengo", model: "deepseek-v4-flash", call: (req: CompletionRequest) => tokengoCallWithModel(req, "deepseek-v4-flash") }]
@@ -61,7 +61,7 @@ function buildRouteTable(): Record<TaskType, RouteEntry[]> {
         ? [{ provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct", call: (req: CompletionRequest) => openrouterCallWithModel(req, "qwen/qwen-2.5-72b-instruct") }]
         : []),
       ...(checkApiKey("CEREBRAS_API_KEY")
-        ? [{ provider: "cerebras", model: "llama-3.3-70b", call: cerebrasCall }]
+        ? [{ provider: "cerebras", model: "gpt-oss-120b", call: cerebrasCall }]
         : []),
       ...(checkApiKey("THORBASE_API_KEY")
         ? [

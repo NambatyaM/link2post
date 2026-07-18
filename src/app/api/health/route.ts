@@ -18,7 +18,7 @@ const MODELS_TO_TEST = [
   { provider: "groq", model: "mixtral-8x7b-32768" },
   { provider: "openrouter", model: "qwen/qwen-2.5-72b-instruct" },
   { provider: "openrouter", model: "meta-llama/llama-3.1-70b-instruct" },
-  { provider: "cerebras", model: "llama-3.3-70b" },
+  { provider: "cerebras", model: "gpt-oss-120b" },
   { provider: "mistral", model: "mistral-small-latest" },
 ];
 
