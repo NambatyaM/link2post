@@ -9,7 +9,7 @@ export async function savePosts(
   if (posts.length === 0) return;
   const rows = posts.map((p) => ({
     project_id: projectId, user_id: userId,
-    content: p.hook + "\n\n" + p.body, hook: p.hook, post_type: "story",
+    content: p.hook + "\n\n" + p.body, hook: p.hook, post_type: p.postType || "story",
     virality_score: p.viralityScore ?? 0, authority_score: p.authorityScore ?? 0,
     comment_potential: p.commentPotential ?? 0, readability_score: p.readabilityScore ?? 0,
     image_prompt: p.imagePrompt, status: "draft",

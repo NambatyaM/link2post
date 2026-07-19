@@ -15,8 +15,9 @@ import { parseJsonResponse } from "@/lib/pipeline/parsers";
 import { savePosts } from "@/lib/pipeline/saver";
 import { GeneratePipelineParamsSchema, GeneratePipelineBodySchema } from "@/lib/pipeline/validation";
 import type { AnalysisResult, PostsResult, ArticlesCalendarResult } from "@/lib/pipeline/types";
+import { checkRateLimit, getRateLimitHeaders, recordGeneration } from "@/lib/rate-limit";
 
-const AI_TIMEOUT = 5_000;
+const AI_MAX_TOKENS = 12_000;
 
 export const maxDuration = 120;
 
@@ -46,6 +47,14 @@ export async function POST(
       return Response.json({ error: "Invalid request body", detail: parsedBody.error.flatten() }, { status: 400 });
     }
     const { voiceProfilePrompt, variation } = parsedBody.data;
+
+    const rateResult = await checkRateLimit({ userId });
+    if (!rateResult.allowed) {
+      return Response.json(
+        { error: "Free limit reached. Upgrade for unlimited generation.", limit: rateResult.limit, retryAfterMs: rateResult.retryAfterMs },
+        { status: 429, headers: getRateLimitHeaders(rateResult) },
+      );
+    }
 
     const supabase = getSupabaseServer(req, token);
     const { data: project, error: fetchError } = await supabase
@@ -89,7 +98,7 @@ export async function POST(
         const analysisResult = await callAI("analysis", providers, [
           { role: "system", content: systemPrompt },
           { role: "user", content: analysisPrompt },
-        ], AI_TIMEOUT);
+        ], AI_MAX_TOKENS);
         analysis = parseJsonResponse<AnalysisResult>(analysisResult.content);
         console.log(`[pipeline] Analysis: ${analysis?.ideas?.length || 0} ideas, voice keys: ${Object.keys(analysis?.voice_profile || {}).join(", ")}`);
 
@@ -98,7 +107,7 @@ export async function POST(
           const postsResult = await callAI("posts", providers, [
             { role: "system", content: systemPrompt },
             { role: "user", content: postsPrompt },
-          ], AI_TIMEOUT).catch(() => null);
+          ], AI_MAX_TOKENS).catch(() => null);
 
           if (postsResult) {
             const postsData = parseJsonResponse<PostsResult>(postsResult.content);
@@ -132,7 +141,7 @@ export async function POST(
       const articlesResult = await callAI("articles", providers, [
         { role: "system", content: systemPrompt },
         { role: "user", content: articlesPrompt },
-      ], AI_TIMEOUT).catch(() => null);
+      ], AI_MAX_TOKENS).catch(() => null);
       if (articlesResult) {
         const articlesData = parseJsonResponse<ArticlesCalendarResult>(articlesResult.content);
         if (articlesData?.articles) {
@@ -156,6 +165,8 @@ export async function POST(
     }
 
     await supabase.from("projects").update({ status: "completed" }).eq("id", projectId).eq("user_id", userId);
+
+    await recordGeneration({ userId });
 
     console.log(`[pipeline] Complete: ${allContent.posts.length} posts, ${allContent.articles.length} articles`);
 

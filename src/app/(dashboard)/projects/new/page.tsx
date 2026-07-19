@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import { NICHE_OPTIONS } from "@/lib/types";
+import UpgradeWall from "@/components/UpgradeWall";
 
 const CONTENT_GOALS = [
   "Thought leadership",
@@ -27,6 +28,7 @@ export default function NewProjectPage() {
   const [goals, setGoals] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
+  const [showUpgradeWall, setShowUpgradeWall] = useState(false);
 
   const charCount = transcript.length;
   const isValid = transcript.trim().length >= 100;
@@ -90,6 +92,11 @@ export default function NewProjectPage() {
       });
 
       if (!genRes.ok) {
+        if (genRes.status === 429) {
+          setShowUpgradeWall(true);
+          setGenerating(false);
+          return;
+        }
         const errData = await genRes.json().catch(() => ({}));
         throw new Error(errData.error || "Generation failed");
       }
@@ -106,6 +113,13 @@ export default function NewProjectPage() {
 
   return (
     <main className="min-h-screen px-6 py-10 max-w-[1200px] mx-auto">
+      {showUpgradeWall && (
+        <UpgradeWall
+          remaining={0}
+          limit={5}
+          onDismiss={() => setShowUpgradeWall(false)}
+        />
+      )}
       <div className="mb-8">
         <h1 className="text-2xl font-bold" style={{ color: "var(--text-primary)" }}>
           New Project

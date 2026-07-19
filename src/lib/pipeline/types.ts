@@ -23,6 +23,6 @@ export interface ArticlesCalendarResult {
 export type CallAIResult = { content: string; provider: string; model: string; latencyMs: number };
 
 export interface PostRow {
-  hook: string; body: string; imagePrompt: string;
+  hook: string; body: string; imagePrompt: string; postType?: string;
   viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number;
 }

@@ -1,7 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 
 const PLANS = [
@@ -9,88 +8,137 @@ const PLANS = [
     id: "free",
     label: "Free",
     price: 0,
-    description: "Try before you commit",
-    features: ["2 posts per month", "Basic exports (TXT)", "Community support"],
-    popular: false,
+    description: "Get started, no credit card",
+    features: [
+      "1 project per month",
+      "Up to 5 generated posts",
+      "Basic carousel generator",
+      "TXT export",
+      "Community support",
+    ],
+    cta: "Start Free",
+    highlighted: false,
+    comingSoon: false,
   },
   {
     id: "starter",
     label: "Starter",
-    price: 15,
-    description: "For growing creators",
-    features: ["50 posts per month", "PDF, DOCX, XLSX exports", "Brand voice profiling", "Carousel editor", "Email support"],
-    popular: false,
-    paddlePriceId: process.env.NEXT_PUBLIC_PADDLE_STARTER_PRICE_ID,
+    price: 19,
+    description: "For creators who post consistently",
+    features: [
+      "10 projects per month",
+      "50 posts per month",
+      "Brand voice profiling",
+      "Full carousel editor + PDF export",
+      "All export formats (PDF, DOCX, CSV, Excel)",
+      "Priority generation",
+      "Email support",
+    ],
+    cta: "Coming Soon",
+    highlighted: true,
+    comingSoon: true,
   },
   {
     id: "pro",
     label: "Pro",
     price: 49,
     description: "For power users & teams",
-    features: ["Unlimited posts", "All export formats", "Advanced analytics", "Priority support"],
-    popular: true,
-    paddlePriceId: process.env.NEXT_PUBLIC_PADDLE_PRO_PRICE_ID,
+    features: [
+      "Unlimited projects",
+      "Unlimited posts",
+      "Advanced analytics dashboard",
+      "Multi-voice profiles",
+      "API access",
+      "Team collaboration (3 seats)",
+      "Dedicated support",
+    ],
+    cta: "Coming Soon",
+    highlighted: false,
+    comingSoon: true,
   },
 ];
 
-export default function PricingPage() {
-  const router = useRouter();
-  const [loading, setLoading] = useState<string | null>(null);
-  const [paddle, setPaddle] = useState<any>(null);
+function WaitlistForm({ planId, onSuccess }: { planId: string; onSuccess: () => void }) {
+  const [email, setEmail] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
 
-  useEffect(() => {
-    const init = async () => {
-      try {
-        const { initializePaddle } = await import("@paddle/paddle-js");
-        const instance = await initializePaddle({
-          token: process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN || "",
-          environment: process.env.NEXT_PUBLIC_PADDLE_ENV === "sandbox" ? "sandbox" : "production",
-        });
-        if (instance) setPaddle(instance);
-      } catch {
-        /* Paddle not configured */
-      }
-    };
-    if (process.env.NEXT_PUBLIC_PADDLE_CLIENT_TOKEN) init();
-  }, []);
-
-  const handleSelect = async (planId: string) => {
-    if (planId === "free") {
-      router.push("/projects/new");
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim() || !email.includes("@")) {
+      setError("Enter a valid email");
       return;
     }
-
-    setLoading(planId);
+    setLoading(true);
+    setError("");
 
     try {
       const supabase = getSupabaseBrowser();
       const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.email) {
-        router.push("/login");
-        return;
-      }
 
-      const plan = PLANS.find((p) => p.id === planId);
-      if (!plan?.paddlePriceId) {
-        setLoading(null);
-        return;
-      }
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ email: email.trim(), source: `pricing_${planId}` }),
+      });
 
-      if (paddle) {
-        paddle.Checkout.open({
-          items: [{ priceId: plan.paddlePriceId, quantity: 1 }],
-          customer: { email: session.user.email },
-          successCallback: () => {
-            router.push("/dashboard");
-          },
-        });
-      }
-    } catch (err) {
-      console.error("Checkout error:", err);
+      if (!res.ok) throw new Error("Signup failed");
+      setDone(true);
+      onSuccess();
+    } catch {
+      setError("Something went wrong. Try again.");
     } finally {
-      setLoading(null);
+      setLoading(false);
     }
   };
+
+  if (done) {
+    return (
+      <div className="text-center py-3">
+        <p className="text-sm font-semibold" style={{ color: "var(--success)" }}>
+          You're on the list!
+        </p>
+        <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+          We'll notify you the moment it launches.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => { setEmail(e.target.value); setError(""); }}
+        placeholder="you@company.com"
+        className="w-full px-3 py-2 rounded-lg text-xs outline-none"
+        style={{
+          background: "var(--bg-tertiary)",
+          border: `1px solid ${error ? "var(--error)" : "var(--border)"}`,
+          color: "var(--text-primary)",
+        }}
+        required
+      />
+      {error && <p className="text-[10px]" style={{ color: "var(--error)" }}>{error}</p>}
+      <button
+        type="submit"
+        disabled={loading}
+        className="w-full py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-50"
+        style={{ background: "var(--accent)", color: "white" }}
+      >
+        {loading ? "Saving..." : "Notify Me"}
+      </button>
+    </form>
+  );
+}
+
+export default function PricingPage() {
+  const [subscribed, setSubscribed] = useState<Record<string, boolean>>({});
 
   return (
     <main className="min-h-screen px-6 py-12" style={{ background: "var(--bg-primary)" }}>
@@ -100,7 +148,7 @@ export default function PricingPage() {
             Simple, transparent pricing
           </h1>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Start free, upgrade when you need more
+            Start free. Upgrade when you're ready for more.
           </p>
         </div>
 
@@ -110,17 +158,19 @@ export default function PricingPage() {
               key={plan.id}
               className="rounded-xl p-6 flex flex-col"
               style={{
-                background: plan.popular ? "linear-gradient(135deg, rgba(99,102,241,0.1), rgba(168,85,247,0.1))" : "var(--bg-secondary)",
-                border: `1px solid ${plan.popular ? "var(--accent)" : "var(--border)"}`,
-                position: plan.popular ? "relative" : undefined,
+                background: plan.highlighted
+                  ? "linear-gradient(135deg, rgba(99,102,241,0.1), rgba(168,85,247,0.1))"
+                  : "var(--bg-secondary)",
+                border: `1px solid ${plan.highlighted ? "var(--accent)" : "var(--border)"}`,
+                position: plan.highlighted ? "relative" : undefined,
               }}
             >
-              {plan.popular && (
+              {plan.highlighted && (
                 <span
                   className="absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-semibold px-3 py-1 rounded-full"
                   style={{ background: "var(--accent)", color: "white" }}
                 >
-                  BEST VALUE
+                  POPULAR
                 </span>
               )}
 
@@ -137,7 +187,7 @@ export default function PricingPage() {
                 </span>
               </p>
 
-              <ul className="flex flex-col gap-2 mb-8 flex-1">
+              <ul className="flex flex-col gap-2 mb-6 flex-1">
                 {plan.features.map((f) => (
                   <li key={f} className="flex items-center gap-2 text-xs" style={{ color: "var(--text-secondary)" }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -148,23 +198,42 @@ export default function PricingPage() {
                 ))}
               </ul>
 
-              <button
-                onClick={() => handleSelect(plan.id)}
-                disabled={loading === plan.id}
-                className="w-full py-3 rounded-lg text-sm font-semibold transition-all disabled:opacity-50"
-                style={{
-                  background: plan.id === "free" ? "var(--bg-tertiary)" : "var(--accent)",
-                  color: plan.id === "free" ? "var(--text-primary)" : "white",
-                }}
-              >
-                {loading === plan.id ? "Opening checkout..." : plan.id === "free" ? "Start Free" : `Subscribe ${plan.label}`}
-              </button>
+              {plan.comingSoon ? (
+                subscribed[plan.id] ? (
+                  <div className="text-center py-3">
+                    <p className="text-sm font-semibold" style={{ color: "var(--success)" }}>
+                      You're on the list!
+                    </p>
+                    <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                      We'll email you the moment this plan launches.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <p className="text-[10px] text-center mb-2" style={{ color: "var(--text-muted)" }}>
+                      Not available yet — join the waitlist
+                    </p>
+                    <WaitlistForm
+                      planId={plan.id}
+                      onSuccess={() => setSubscribed((prev) => ({ ...prev, [plan.id]: true }))}
+                    />
+                  </div>
+                )
+              ) : (
+                <a
+                  href="/signup"
+                  className="w-full py-3 rounded-lg text-sm font-semibold transition-all text-center block"
+                  style={{ background: "var(--bg-tertiary)", color: "var(--text-primary)" }}
+                >
+                  {plan.cta}
+                </a>
+              )}
             </div>
           ))}
         </div>
 
         <p className="text-xs text-center mt-8" style={{ color: "var(--text-muted)" }}>
-          All plans include a 7-day free trial. Cancel anytime. Payments secured by Paddle.
+          Payments secured by Paddle. Cancel anytime. No hidden fees.
         </p>
       </div>
     </main>

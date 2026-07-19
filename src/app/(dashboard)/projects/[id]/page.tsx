@@ -6,6 +6,7 @@ import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import type { Project, LinkedInPost } from "@/lib/types";
 import PostEditor from "@/components/features/PostEditor";
 import ExportToolbar from "@/components/features/ExportToolbar";
+import UpgradeWall from "@/components/UpgradeWall";
 
 interface ProjectDetail extends Project {
   posts: LinkedInPost[];
@@ -64,6 +65,7 @@ function ProjectContent({ projectId }: { projectId: string }) {
   const [editTitle, setEditTitle] = useState("");
   const [editAudience, setEditAudience] = useState("");
   const [editNiche, setEditNiche] = useState("");
+  const [showUpgradeWall, setShowUpgradeWall] = useState(false);
 
   const handleUpdatePost = useCallback((index: number, updated: LinkedInPost) => {
     setPosts((prev) => {
@@ -203,6 +205,11 @@ function ProjectContent({ projectId }: { projectId: string }) {
       });
 
       if (!response.ok) {
+        if (response.status === 429) {
+          setShowUpgradeWall(true);
+          setGenerating(false);
+          return;
+        }
         const errData = await response.json().catch(() => ({}));
         throw new Error(errData.error || "Generation failed");
       }
@@ -252,6 +259,13 @@ function ProjectContent({ projectId }: { projectId: string }) {
 
   return (
     <main className="min-h-screen flex flex-col">
+      {showUpgradeWall && (
+        <UpgradeWall
+          remaining={0}
+          limit={5}
+          onDismiss={() => setShowUpgradeWall(false)}
+        />
+      )}
       <div
         className="flex items-center justify-between px-6 py-3 shrink-0"
         style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-primary)" }}
