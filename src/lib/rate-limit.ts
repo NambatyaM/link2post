@@ -29,11 +29,14 @@ async function getUserPlan(userId: string): Promise<Plan> {
     const supabase = getSupabaseServer();
     const { data: profile } = await supabase
       .from("user_profiles")
-      .select("plan")
+      .select("plan, beta_access")
       .eq("id", userId)
       .maybeSingle();
     if (profile?.plan === "starter" || profile?.plan === "pro") {
       return profile.plan;
+    }
+    if (profile?.beta_access) {
+      return "pro";
     }
   } catch { /* fall through to default */ }
   return "free";

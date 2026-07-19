@@ -12,10 +12,32 @@ export default function UpgradeWall({ remaining, limit, onDismiss }: UpgradeWall
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [done, setDone] = useState(false);
+  const [done, setDone] = useState<"unlocked" | "waitlist" | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleUnlock = async () => {
+    if (!email.trim() || !email.includes("@")) {
+      setError("Enter a valid email");
+      return;
+    }
+    setLoading(true);
+    setError("");
+
+    try {
+      const res = await fetch("/api/beta/unlock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      setDone("unlocked");
+    } catch {
+      setError("Something went wrong");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleWaitlist = async () => {
     if (!email.trim() || !email.includes("@")) {
       setError("Enter a valid email");
       return;
@@ -27,10 +49,10 @@ export default function UpgradeWall({ remaining, limit, onDismiss }: UpgradeWall
       const res = await fetch("/api/waitlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), source: "limit_wall" }),
+        body: JSON.stringify({ email: email.trim(), source: "limit_wall_waitlist" }),
       });
       if (!res.ok) throw new Error("Failed");
-      setDone(true);
+      setDone("waitlist");
     } catch {
       setError("Something went wrong");
     } finally {
@@ -60,37 +82,48 @@ export default function UpgradeWall({ remaining, limit, onDismiss }: UpgradeWall
             🚀
           </div>
           <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
-            You&apos;ve hit your free limit
+            You&apos;ve used all {limit} free posts
           </h2>
           <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
-            You&apos;ve used all {limit} free posts this month.
-            Paid plans are launching soon — with unlimited posts, brand voice profiling, carousel exports, and more.
+            You have two options — both free, both immediate.
           </p>
         </div>
 
-        {done ? (
+        {done === "unlocked" ? (
           <div className="text-center py-4">
             <p className="text-sm font-semibold mb-1" style={{ color: "var(--success)" }}>
-              You&apos;re on the list!
+              Full access unlocked!
             </p>
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              We&apos;ll email you the moment paid plans go live.<br />
-              No spam. Just a heads-up when it&apos;s ready.
+            <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
+              All features are now available. Reload this page to continue generating.
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full py-2.5 rounded-lg text-sm font-semibold"
+              style={{ background: "var(--accent)", color: "white" }}
+            >
+              Reload & Continue
+            </button>
+          </div>
+        ) : done === "waitlist" ? (
+          <div className="text-center py-4">
+            <p className="text-sm font-semibold mb-1" style={{ color: "var(--success)" }}>
+              You&apos;re on the waitlist!
+            </p>
+            <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
+              We&apos;ll email you when paid plans launch with unlimited generation.
             </p>
             <button
               onClick={onDismiss}
-              className="mt-4 text-xs font-medium px-4 py-2 rounded-lg"
+              className="w-full py-2.5 rounded-lg text-sm font-semibold"
               style={{ color: "var(--text-muted)", border: "1px solid var(--border)" }}
             >
-              Back to dashboard
+              Back to Dashboard
             </button>
           </div>
         ) : (
           <>
-            <p className="text-xs font-medium text-center mb-3" style={{ color: "var(--text-secondary)" }}>
-              Enter your email to get notified when paid plans launch:
-            </p>
-            <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3 mb-4">
               <input
                 type="email"
                 value={email}
@@ -106,17 +139,38 @@ export default function UpgradeWall({ remaining, limit, onDismiss }: UpgradeWall
                 autoFocus
               />
               {error && <p className="text-[11px] text-center" style={{ color: "var(--error)" }}>{error}</p>}
+            </div>
+
+            <div className="flex flex-col gap-2">
               <button
-                type="submit"
+                onClick={handleUnlock}
                 disabled={loading}
                 className="w-full py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
                 style={{ background: "var(--accent)", color: "white" }}
               >
-                {loading ? "Saving..." : "Notify Me When Plans Launch"}
+                {loading ? "Working..." : "Get Full Access — Free During Beta"}
               </button>
-            </form>
+              <button
+                onClick={handleWaitlist}
+                disabled={loading}
+                className="w-full py-3 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                style={{ background: "transparent", color: "var(--text-muted)", border: "1px solid var(--border)" }}
+              >
+                Just Join the Waitlist
+              </button>
+            </div>
+
+            <div className="mt-4 rounded-lg p-3" style={{ background: "var(--bg-secondary)" }}>
+              <p className="text-[10px] font-medium mb-1" style={{ color: "var(--text-secondary)" }}>
+                <strong>Full Access:</strong> Unlocks all features now + priority waitlist
+              </p>
+              <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>
+                <strong>Waitlist:</strong> Get notified when paid plans launch (no features unlocked now)
+              </p>
+            </div>
+
             <p className="text-[10px] text-center mt-3" style={{ color: "var(--text-muted)" }}>
-              No spam. Unsubscribe anytime. We only email you when something ships.
+              No spam. We only email you when something ships.
             </p>
           </>
         )}

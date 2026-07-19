@@ -42,3 +42,4 @@ next-env.d.ts
 
 dev-*.log
 *-player-script.js
+pull-ollama-models.bat

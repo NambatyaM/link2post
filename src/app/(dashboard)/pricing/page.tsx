@@ -235,6 +235,25 @@ export default function PricingPage() {
         <p className="text-xs text-center mt-8" style={{ color: "var(--text-muted)" }}>
           Payments secured by Paddle. Cancel anytime. No hidden fees.
         </p>
+
+        <div
+          className="mt-8 rounded-xl p-6 text-center"
+          style={{ background: "linear-gradient(135deg, rgba(99,102,241,0.08), rgba(168,85,247,0.08))", border: "1px solid var(--accent)" }}
+        >
+          <p className="text-sm font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
+            Want everything now, for free?
+          </p>
+          <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>
+            Join the beta program. Get all Pro features unlocked during our beta period.
+          </p>
+          <a
+            href="/beta"
+            className="inline-block px-6 py-2.5 rounded-lg text-xs font-semibold transition-all"
+            style={{ background: "var(--accent)", color: "white" }}
+          >
+            Get Full Access →
+          </a>
+        </div>
       </div>
     </main>
   );

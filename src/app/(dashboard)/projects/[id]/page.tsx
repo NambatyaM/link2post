@@ -7,6 +7,7 @@ import type { Project, LinkedInPost } from "@/lib/types";
 import PostEditor from "@/components/features/PostEditor";
 import ExportToolbar from "@/components/features/ExportToolbar";
 import UpgradeWall from "@/components/UpgradeWall";
+import GenerationFeedback from "@/components/GenerationFeedback";
 
 interface ProjectDetail extends Project {
   posts: LinkedInPost[];
@@ -66,6 +67,7 @@ function ProjectContent({ projectId }: { projectId: string }) {
   const [editAudience, setEditAudience] = useState("");
   const [editNiche, setEditNiche] = useState("");
   const [showUpgradeWall, setShowUpgradeWall] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   const handleUpdatePost = useCallback((index: number, updated: LinkedInPost) => {
     setPosts((prev) => {
@@ -235,6 +237,7 @@ function ProjectContent({ projectId }: { projectId: string }) {
       setGenerateProgress("");
       setSaveMessage(data.posts?.length ? `Generated ${data.posts.length} posts!` : "Generation complete");
       setTimeout(() => setSaveMessage(""), 3000);
+      if (data.posts?.length) setShowFeedback(true);
     } catch (err) {
       setGenerateProgress("");
       setSaveMessage(err instanceof Error ? err.message : "Generation failed");
@@ -350,6 +353,8 @@ function ProjectContent({ projectId }: { projectId: string }) {
               </button>
             ) : null}
           </div>
+
+          <GenerationFeedback projectId={projectId} shown={showFeedback} onDismiss={() => setShowFeedback(false)} />
 
           {posts.length === 0 ? (
             <div className="rounded-lg px-4 py-8 text-center" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
