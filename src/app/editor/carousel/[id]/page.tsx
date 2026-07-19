@@ -31,7 +31,7 @@ async function fetchProject(projectId: string): Promise<{ title: string; transcr
 
     const data = await res.json();
     const project = data.project;
-    return { title: project.title, transcript: project.raw_transcript };
+    return { title: project.title, transcript: project.rawTranscript };
   } catch {
     return null;
   }
