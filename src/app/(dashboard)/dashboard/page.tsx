@@ -7,6 +7,9 @@ import type { Project } from "@/lib/types";
 
 interface ProjectWithPosts extends Project {
   postCount: number;
+  draftCount: number;
+  scheduledCount: number;
+  publishedCount: number;
 }
 
 function SkeletonCard() {
@@ -61,8 +64,13 @@ function timeAgo(dateStr: string) {
   return new Date(dateStr).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 }
 
+interface PostScore {
+  viralityScore: number;
+}
+
 export default function DashboardPage() {
   const [projects, setProjects] = useState<ProjectWithPosts[]>([]);
+  const [allPosts, setAllPosts] = useState<PostScore[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -78,7 +86,7 @@ export default function DashboardPage() {
           return;
         }
 
-        const res = await fetch("/api/projects", {
+        const res = await fetch("/api/projects?include=posts", {
           headers: { Authorization: `Bearer ${session.access_token}` },
         });
 
@@ -86,6 +94,7 @@ export default function DashboardPage() {
 
         const data = await res.json();
         setProjects(data.projects || []);
+        setAllPosts(data.posts || []);
       } catch {
         setError("Could not load projects");
       } finally {
@@ -97,8 +106,11 @@ export default function DashboardPage() {
   }, []);
 
   const totalPosts = projects.reduce((sum, p) => sum + p.postCount, 0);
-  const avgVirality = projects.length > 0
-    ? Math.round(projects.reduce((sum, p) => sum + (p.postCount > 0 ? 75 : 0), 0) / Math.max(projects.length, 1))
+  const totalDraft = projects.reduce((sum, p) => sum + p.draftCount, 0);
+  const totalScheduled = projects.reduce((sum, p) => sum + p.scheduledCount, 0);
+  const totalPublished = projects.reduce((sum, p) => sum + p.publishedCount, 0);
+  const avgVirality = allPosts.length > 0
+    ? Math.round(allPosts.reduce((sum, p) => sum + (p.viralityScore || 0), 0) / allPosts.length)
     : 0;
 
   return (
@@ -112,9 +124,10 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-8">
         {loading ? (
           <>
+            <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
             <SkeletonCard />
@@ -127,9 +140,34 @@ export default function DashboardPage() {
                   <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                   <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
                 </svg>
-                <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Posts Generated</span>
+                <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Content Generated</span>
               </div>
               <p className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>{totalPosts}</p>
+            </div>
+
+            <div className="rounded-xl p-5" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
+              <div className="flex items-center gap-2 mb-2">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#60A5FA" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
+                </svg>
+                <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Content Pipeline</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="flex flex-col items-center">
+                  <span className="text-lg font-bold" style={{ color: "var(--text-muted)" }}>{totalDraft}</span>
+                  <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>draft</span>
+                </div>
+                <span className="text-lg" style={{ color: "var(--text-muted)" }}>→</span>
+                <div className="flex flex-col items-center">
+                  <span className="text-lg font-bold" style={{ color: "#60A5FA" }}>{totalScheduled}</span>
+                  <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>scheduled</span>
+                </div>
+                <span className="text-lg" style={{ color: "var(--text-muted)" }}>→</span>
+                <div className="flex flex-col items-center">
+                  <span className="text-lg font-bold" style={{ color: "#818CF8" }}>{totalPublished}</span>
+                  <span className="text-[9px]" style={{ color: "var(--text-muted)" }}>published</span>
+                </div>
+              </div>
             </div>
 
             <div className="rounded-xl p-5" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
@@ -139,7 +177,7 @@ export default function DashboardPage() {
                 </svg>
                 <span className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>Avg Virality Score</span>
               </div>
-              <p className="text-3xl font-bold" style={{ color: "var(--text-primary)" }}>{avgVirality}</p>
+              <p className="text-3xl font-bold" style={{ color: avgVirality >= 75 ? "var(--success)" : "var(--accent)" }}>{avgVirality}</p>
             </div>
 
             <div className="rounded-xl p-5" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
@@ -225,7 +263,10 @@ export default function DashboardPage() {
                       {project.title}
                     </span>
                     <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                      {project.postCount} posts &middot; {timeAgo(project.createdAt)}
+                      {project.postCount} pieces &middot; {timeAgo(project.createdAt)}
+                      {project.draftCount > 0 && ` · ${project.draftCount} draft`}
+                      {project.scheduledCount > 0 && ` · ${project.scheduledCount} scheduled`}
+                      {project.publishedCount > 0 && ` · ${project.publishedCount} published`}
                     </span>
                   </div>
                   <span

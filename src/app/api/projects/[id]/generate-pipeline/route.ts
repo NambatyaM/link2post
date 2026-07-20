@@ -12,7 +12,7 @@ import type { VideoInfo } from "@/lib/types";
 import { generateFullLinkedInResponse } from "@/lib/local-generator";
 import { getAvailableProviders, callAI } from "@/lib/pipeline/orchestrator";
 import { parseJsonResponse } from "@/lib/pipeline/parsers";
-import { savePosts } from "@/lib/pipeline/saver";
+import { savePosts, saveArticles } from "@/lib/pipeline/saver";
 import { GeneratePipelineParamsSchema, GeneratePipelineBodySchema } from "@/lib/pipeline/validation";
 import type { AnalysisResult, PostsResult, ArticlesCalendarResult } from "@/lib/pipeline/types";
 import { checkRateLimit, getRateLimitHeaders, recordGeneration } from "@/lib/rate-limit";
@@ -157,6 +157,7 @@ export async function POST(
     // ═══════════════════════════════════════════════════════════════
     try {
       await savePosts(supabase, projectId, userId, allContent.posts);
+      await saveArticles(supabase, projectId, userId, allContent.articles, allContent.posts.length);
     } catch (saveError) {
       const msg = saveError instanceof Error ? saveError.message : "Failed to save posts";
       console.error("[pipeline] Save failed:", msg);

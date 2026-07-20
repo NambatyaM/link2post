@@ -22,7 +22,8 @@ describe("savePosts", () => {
         comment_potential: 70,
         readability_score: 85,
         image_prompt: "An image",
-        status: "draft",
+        status: "scheduled",
+        scheduled_date: expect.any(String),
       }),
     ]);
   });

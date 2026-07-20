@@ -17,7 +17,7 @@ export async function GET(
 
     const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id, user_id, title, raw_transcript, status, niche, audience, goals, created_at")
+      .select("id, user_id, title, raw_transcript, status, niche, audience, goals, carousel_slides, created_at")
       .eq("id", id)
       .eq("user_id", user.userId)
       .single();
@@ -28,7 +28,7 @@ export async function GET(
 
     const { data: posts, error: postsError } = await supabase
       .from("posts")
-      .select("id, project_id, user_id, content, hook, post_type, virality_score, authority_score, comment_potential, readability_score, image_prompt, status, scheduled_date, created_at")
+      .select("id, project_id, user_id, content, hook, post_type, virality_score, authority_score, comment_potential, readability_score, image_prompt, status, scheduled_date, published_at, created_at, updated_at")
       .eq("project_id", id)
       .eq("user_id", user.userId)
       .order("created_at", { ascending: true });
@@ -46,6 +46,7 @@ export async function GET(
       niche: project.niche,
       audience: project.audience,
       goals: project.goals,
+      carouselSlides: project.carousel_slides,
       status: project.status,
       createdAt: project.created_at,
     };
@@ -65,7 +66,9 @@ export async function GET(
       imagePrompt: p.image_prompt,
       status: p.status,
       scheduledDate: p.scheduled_date,
+      publishedAt: p.published_at,
       createdAt: p.created_at,
+      updatedAt: p.updated_at,
     }));
 
     return Response.json({ project: mappedProject, posts: mappedPosts });
@@ -91,7 +94,8 @@ export async function PATCH(
       audience?: string;
       niche?: string;
       goals?: string;
-      posts?: Array<{ hook: string; body: string; imagePrompt: string; viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number; status?: string }>;
+      carousel_slides?: unknown;
+      posts?: Array<{ id?: string; hook: string; body: string; imagePrompt: string; postType?: string; viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number; status?: string; scheduledDate?: string | null; publishedAt?: string | null }>;
     };
 
     const supabase = getSupabaseServer(req, token);
@@ -105,39 +109,69 @@ export async function PATCH(
 
     if (!project) return Response.json({ error: "Not found" }, { status: 404 });
 
-    const projectUpdates: Record<string, string> = {};
+    const projectUpdates: Record<string, unknown> = {};
     if (body.title !== undefined) projectUpdates.title = body.title;
     if (body.audience !== undefined) projectUpdates.audience = body.audience;
     if (body.niche !== undefined) projectUpdates.niche = body.niche;
     if (body.goals !== undefined) projectUpdates.goals = body.goals;
+    if (body.carousel_slides !== undefined) projectUpdates.carousel_slides = body.carousel_slides;
 
     if (Object.keys(projectUpdates).length > 0) {
       await supabase.from("projects").update(projectUpdates).eq("id", projectId).eq("user_id", user.userId);
     }
 
     if (body.posts) {
-      await supabase
+      const existingIds = body.posts.filter((p) => p.id).map((p) => p.id!);
+
+      const { data: existingPosts } = await supabase
         .from("posts")
-        .delete()
+        .select("id")
         .eq("project_id", projectId)
         .eq("user_id", user.userId);
 
-      if (body.posts.length > 0) {
-        const rows = body.posts.map((post) => ({
-          project_id: projectId,
-          user_id: user.userId,
-          content: post.hook + "\n\n" + post.body,
-          hook: post.hook,
-          post_type: "story",
-          virality_score: post.viralityScore ?? 0,
-          authority_score: post.authorityScore ?? 0,
-          comment_potential: post.commentPotential ?? 0,
-          readability_score: post.readabilityScore ?? 0,
-          image_prompt: post.imagePrompt,
-          status: post.status || "draft",
-        }));
+      const existingIdSet = new Set((existingPosts || []).map((p) => p.id));
 
-        await supabase.from("posts").insert(rows);
+      const idsToKeep = new Set(existingIds.filter((id) => existingIdSet.has(id)));
+
+      for (const id of existingIdSet) {
+        if (!idsToKeep.has(id)) {
+          await supabase.from("posts").delete().eq("id", id);
+        }
+      }
+
+      for (const post of body.posts) {
+        if (post.id && idsToKeep.has(post.id)) {
+          await supabase.from("posts").update({
+            content: post.hook + "\n\n" + post.body,
+            hook: post.hook,
+            post_type: post.postType || "story",
+            virality_score: post.viralityScore ?? 0,
+            authority_score: post.authorityScore ?? 0,
+            comment_potential: post.commentPotential ?? 0,
+            readability_score: post.readabilityScore ?? 0,
+            image_prompt: post.imagePrompt,
+            status: post.status || "draft",
+            scheduled_date: post.scheduledDate || null,
+            published_at: post.publishedAt || null,
+            updated_at: new Date().toISOString(),
+          }).eq("id", post.id);
+        } else {
+          await supabase.from("posts").insert({
+            project_id: projectId,
+            user_id: user.userId,
+            content: post.hook + "\n\n" + post.body,
+            hook: post.hook,
+            post_type: post.postType || "story",
+            virality_score: post.viralityScore ?? 0,
+            authority_score: post.authorityScore ?? 0,
+            comment_potential: post.commentPotential ?? 0,
+            readability_score: post.readabilityScore ?? 0,
+            image_prompt: post.imagePrompt,
+            status: post.status || "draft",
+            scheduled_date: post.scheduledDate || null,
+            published_at: post.publishedAt || null,
+          });
+        }
       }
     }
 

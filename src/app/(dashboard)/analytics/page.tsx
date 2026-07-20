@@ -71,23 +71,16 @@ export default function AnalyticsPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) { setLoading(false); return; }
 
-      const res = await fetch("/api/projects", {
+      const res = await fetch("/api/projects?include=posts", {
         headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
 
-      const allProjects: ProjectData[] = [];
-      for (const p of data.projects || []) {
-        const pRes = await fetch(`/api/projects/${p.id}`, {
-          headers: { Authorization: `Bearer ${session.access_token}` },
-        });
-        if (pRes.ok) {
-          const pData = await pRes.json();
-          allProjects.push({ ...p, posts: pData.posts || [] });
-        }
-      }
-      setProjects(allProjects);
+      setProjects((data.projects || []).map((p: { id: string; title: string; status: string; createdAt: string }) => ({
+        ...p,
+        posts: (data.posts || []).filter((post: { projectId: string }) => post.projectId === p.id),
+      })));
     } catch {
       setProjects([]);
     } finally {
@@ -144,21 +137,6 @@ export default function AnalyticsPage() {
       coachInsights.push("Many posts are still in draft. Approve your best posts to keep your calendar active.");
     }
   }
-
-  const calendarPerformance = [
-    { day: "Monday", rating: 4 },
-    { day: "Tuesday", rating: 5 },
-    { day: "Wednesday", rating: 4 },
-    { day: "Thursday", rating: 5 },
-    { day: "Friday", rating: 4 },
-  ];
-
-  const ctaTypes = [
-    { type: "Question CTA", pct: 40 },
-    { type: "Discussion CTA", pct: 25 },
-    { type: "Download CTA", pct: 15 },
-    { type: "No CTA", pct: 20 },
-  ];
 
   return (
     <main className="min-h-screen px-6 py-10 max-w-[1280px] mx-auto">
@@ -297,53 +275,38 @@ export default function AnalyticsPage() {
                 </div>
 
                 <div className="rounded-xl p-5" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
-                  <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>Calendar Performance</h3>
-                  <div className="flex flex-col gap-2">
-                    {calendarPerformance.map((cp) => (
-                      <div key={cp.day} className="flex items-center justify-between">
-                        <span className="text-xs" style={{ color: "var(--text-secondary)" }}>{cp.day}</span>
-                        <span className="text-xs">{"★".repeat(cp.rating)}{"☆".repeat(5 - cp.rating)}</span>
+                  <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>Status Pipeline</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[
+                      { label: "Draft", count: statusCount.draft ?? 0, color: "var(--text-muted)" },
+                      { label: "Scheduled", count: statusCount.scheduled ?? 0, color: "#60A5FA" },
+                      { label: "Published", count: statusCount.published ?? 0, color: "#818CF8" },
+                    ].map((s) => (
+                      <div key={s.label} className="rounded-lg p-3 text-center" style={{ background: "var(--bg-tertiary)" }}>
+                        <span className="text-2xl font-bold block" style={{ color: s.color }}>{s.count}</span>
+                        <span className="text-[10px]" style={{ color: "var(--text-muted)" }}>{s.label}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
 
-              {/* Best Performing + Posting Consistency */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="rounded-xl p-5" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
-                  <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>Best Performing Content Type</h3>
-                  <div className="flex flex-col gap-2">
-                    {Object.entries(typeCount).sort((a, b) => b[1] - a[1]).map(([type, count]) => {
-                      const avg = allPosts.filter((p) => p.postType === type).reduce((s, p) => s + p.viralityScore, 0) / count;
-                      return (
-                        <div key={type} className="flex items-center justify-between p-2 rounded-lg" style={{ background: "var(--bg-tertiary)" }}>
-                          <span className="text-xs capitalize" style={{ color: "var(--text-secondary)" }}>{type.replace("_", " ")}</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs">{avg >= 80 ? "★★★★★" : avg >= 60 ? "★★★★☆" : "★★★☆☆"}</span>
-                            <span className="text-[10px] font-medium" style={{ color: avg >= 80 ? "#34D399" : "var(--accent)" }}>{Math.round(avg)}/100</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="rounded-xl p-5" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
-                  <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>CTA Analysis</h3>
-                  <div className="flex flex-col gap-2.5">
-                    {ctaTypes.map((cta) => (
-                      <div key={cta.type}>
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{cta.type}</span>
-                          <span className="text-[11px] font-medium" style={{ color: "var(--accent)" }}>{cta.pct}%</span>
-                        </div>
-                        <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-tertiary)" }}>
-                          <div className="h-full rounded-full" style={{ width: `${cta.pct}%`, background: "var(--accent)" }} />
+              {/* Best Performing Content Type */}
+              <div className="rounded-xl p-5" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
+                <h3 className="text-sm font-semibold mb-3" style={{ color: "var(--text-primary)" }}>Best Performing Content Type</h3>
+                <div className="flex flex-col gap-2">
+                  {Object.entries(typeCount).sort((a, b) => b[1] - a[1]).map(([type, count]) => {
+                    const avg = allPosts.filter((p) => p.postType === type).reduce((s, p) => s + p.viralityScore, 0) / count;
+                    return (
+                      <div key={type} className="flex items-center justify-between p-2 rounded-lg" style={{ background: "var(--bg-tertiary)" }}>
+                        <span className="text-xs capitalize" style={{ color: "var(--text-secondary)" }}>{type.replace("_", " ")}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs">{avg >= 80 ? "★★★★★" : avg >= 60 ? "★★★★☆" : "★★★☆☆"}</span>
+                          <span className="text-[10px] font-medium" style={{ color: avg >= 80 ? "#34D399" : "var(--accent)" }}>{Math.round(avg)}/100</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>
@@ -399,30 +362,7 @@ export default function AnalyticsPage() {
                 </div>
               </div>
 
-              {/* Brand Voice Consistency */}
-              <div className="rounded-xl p-4" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
-                <h3 className="text-xs font-semibold mb-3" style={{ color: "var(--text-primary)" }}>Brand Voice Consistency</h3>
-                <div className="flex flex-col gap-2">
-                  {[
-                    { label: "Consistency", pct: 96 },
-                    { label: "Tone", pct: 95 },
-                    { label: "Storytelling", pct: 91 },
-                    { label: "Authority", pct: 97 },
-                  ].map((bv) => (
-                    <div key={bv.label} className="flex items-center justify-between">
-                      <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{bv.label}</span>
-                      <div className="flex items-center gap-2">
-                        <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-tertiary)" }}>
-                          <div className="h-full rounded-full" style={{ width: `${bv.pct}%`, background: bv.pct >= 90 ? "#34D399" : "var(--accent)" }} />
-                        </div>
-                        <span className="text-[10px] font-medium" style={{ color: bv.pct >= 90 ? "#34D399" : "var(--accent)" }}>{bv.pct}%</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Monthly AI Report */}
+              {/* Monthly Summary */}
               <div className="rounded-xl p-4" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
                 <h3 className="text-xs font-semibold mb-3" style={{ color: "var(--text-primary)" }}>Monthly Summary</h3>
                 <div className="flex flex-col gap-1.5">
