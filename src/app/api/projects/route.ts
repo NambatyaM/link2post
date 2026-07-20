@@ -67,7 +67,7 @@ export async function GET(req: NextRequest) {
     if (includePosts && projectIds.length > 0) {
       const { data: allPosts } = await supabase
         .from("posts")
-        .select("id, project_id, content, hook, post_type, virality_score, authority_score, comment_potential, readability_score, image_prompt, status, scheduled_date, published_at, created_at, updated_at")
+        .select("id, project_id, content, hook, post_type, virality_score, authority_score, comment_potential, readability_score, image_prompt, status, scheduled_date, published_at, created_at, updated_at, voice_consistency_score")
         .in("project_id", projectIds)
         .eq("user_id", user.userId)
         .order("created_at", { ascending: false });
@@ -94,6 +94,7 @@ export async function GET(req: NextRequest) {
           publishedAt: p.published_at,
           createdAt: p.created_at,
           updatedAt: p.updated_at,
+          voiceConsistency: p.voice_consistency_score,
         }));
       }
     }

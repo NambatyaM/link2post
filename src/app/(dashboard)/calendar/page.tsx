@@ -601,7 +601,7 @@ export default function CalendarPage() {
                 <rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" />
               </svg>
               <p className="text-sm mb-1" style={{ color: "var(--text-muted)" }}>No content yet</p>
-              <p className="text-xs" style={{ color: "var(--text-muted)" }}>Generate posts in a project, then they will appear here.</p>
+              <p className="text-xs" style={{ color: "var(--text-muted)" }}>Generate content in a project, then it will appear here.</p>
             </div>
           )}
         </div>

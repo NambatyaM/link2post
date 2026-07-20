@@ -127,7 +127,7 @@ const GROWTH_SCORES = [
 
 const DASHBOARD_STATS = [
   { label: "Brand Voice", value: "96%", sub: "consistency" },
-  { label: "Posts Generated", value: "28", sub: "this month" },
+  { label: "Content Generated", value: "28", sub: "this month" },
   { label: "Carousels Designed", value: "6", sub: "exported" },
   { label: "Calendar", value: "4 wks", sub: "fully filled" },
   { label: "AI Quality Score", value: "94/100", sub: "average" },

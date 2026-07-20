@@ -132,6 +132,7 @@ export async function POST(
         hook: p.hook, body: p.body, imagePrompt: p.imagePrompt,
         postType: "story" as const, viralityScore: 70, authorityScore: 65,
         commentPotential: 60, readabilityScore: 70,
+        voiceConsistency: { toneMatch: 7, vocabularyMatch: 7, formattingMatch: 7, storytellingMatch: 7, overall: 7 },
       }));
       allContent.articles = localResult.articles.map((a) => ({
         title: a.title, body: a.body, imagePrompts: a.imagePrompts,

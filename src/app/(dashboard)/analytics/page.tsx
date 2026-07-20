@@ -50,6 +50,13 @@ interface PostData {
   readabilityScore: number;
   status: string;
   createdAt: string;
+  voiceConsistency?: {
+    toneMatch: number;
+    vocabularyMatch: number;
+    formattingMatch: number;
+    storytellingMatch: number;
+    overall: number;
+  } | null;
 }
 
 interface ProjectData {
@@ -116,6 +123,14 @@ export default function AnalyticsPage() {
 
   const topPost = allPosts.length > 0 ? allPosts.reduce((best, p) => p.viralityScore > best.viralityScore ? p : best) : null;
   const worstPost = allPosts.length > 0 ? allPosts.reduce((worst, p) => p.viralityScore < worst.viralityScore ? p : worst) : null;
+
+  const postsWithVoice = allPosts.filter((p) => p.voiceConsistency?.overall);
+  const avgVoiceConsistency = {
+    toneMatch: postsWithVoice.length > 0 ? Math.round(postsWithVoice.reduce((s, p) => s + (p.voiceConsistency!.toneMatch || 0), 0) / postsWithVoice.length * 10) : 0,
+    vocabularyMatch: postsWithVoice.length > 0 ? Math.round(postsWithVoice.reduce((s, p) => s + (p.voiceConsistency!.vocabularyMatch || 0), 0) / postsWithVoice.length * 10) : 0,
+    formattingMatch: postsWithVoice.length > 0 ? Math.round(postsWithVoice.reduce((s, p) => s + (p.voiceConsistency!.formattingMatch || 0), 0) / postsWithVoice.length * 10) : 0,
+    storytellingMatch: postsWithVoice.length > 0 ? Math.round(postsWithVoice.reduce((s, p) => s + (p.voiceConsistency!.storytellingMatch || 0), 0) / postsWithVoice.length * 10) : 0,
+  };
 
   const strengths: string[] = [];
   const weaknesses: string[] = [];
@@ -361,6 +376,34 @@ export default function AnalyticsPage() {
                   })}
                 </div>
               </div>
+
+              {/* Brand Voice Consistency */}
+              {postsWithVoice.length > 0 && (
+                <div className="rounded-xl p-4" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
+                  <h3 className="text-xs font-semibold mb-3" style={{ color: "var(--text-primary)" }}>Brand Voice Consistency</h3>
+                  <div className="flex flex-col gap-2">
+                    {[
+                      { label: "Tone Match", pct: avgVoiceConsistency.toneMatch },
+                      { label: "Vocabulary", pct: avgVoiceConsistency.vocabularyMatch },
+                      { label: "Formatting", pct: avgVoiceConsistency.formattingMatch },
+                      { label: "Storytelling", pct: avgVoiceConsistency.storytellingMatch },
+                    ].map((bv) => (
+                      <div key={bv.label} className="flex items-center justify-between">
+                        <span className="text-[11px]" style={{ color: "var(--text-secondary)" }}>{bv.label}</span>
+                        <div className="flex items-center gap-2">
+                          <div className="w-16 h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-tertiary)" }}>
+                            <div className="h-full rounded-full" style={{ width: `${bv.pct}%`, background: bv.pct >= 80 ? "#34D399" : "var(--accent)" }} />
+                          </div>
+                          <span className="text-[10px] font-medium" style={{ color: bv.pct >= 80 ? "#34D399" : "var(--accent)" }}>{bv.pct}%</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] mt-2" style={{ color: "var(--text-muted)" }}>
+                    Based on {postsWithVoice.length} post{postsWithVoice.length !== 1 ? "s" : ""} with voice analysis
+                  </p>
+                </div>
+              )}
 
               {/* Monthly Summary */}
               <div className="rounded-xl p-4" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>

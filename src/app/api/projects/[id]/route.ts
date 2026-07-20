@@ -28,7 +28,7 @@ export async function GET(
 
     const { data: posts, error: postsError } = await supabase
       .from("posts")
-      .select("id, project_id, user_id, content, hook, post_type, virality_score, authority_score, comment_potential, readability_score, image_prompt, status, scheduled_date, published_at, created_at, updated_at")
+      .select("id, project_id, user_id, content, hook, post_type, virality_score, authority_score, comment_potential, readability_score, image_prompt, status, scheduled_date, published_at, created_at, updated_at, voice_consistency_score")
       .eq("project_id", id)
       .eq("user_id", user.userId)
       .order("created_at", { ascending: true });
@@ -69,6 +69,7 @@ export async function GET(
       publishedAt: p.published_at,
       createdAt: p.created_at,
       updatedAt: p.updated_at,
+      voiceConsistency: p.voice_consistency_score,
     }));
 
     return Response.json({ project: mappedProject, posts: mappedPosts });
@@ -95,7 +96,7 @@ export async function PATCH(
       niche?: string;
       goals?: string;
       carousel_slides?: unknown;
-      posts?: Array<{ id?: string; hook: string; body: string; imagePrompt: string; postType?: string; viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number; status?: string; scheduledDate?: string | null; publishedAt?: string | null }>;
+      posts?: Array<{ id?: string; hook: string; body: string; imagePrompt: string; postType?: string; viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number; status?: string; scheduledDate?: string | null; publishedAt?: string | null; voiceConsistency?: unknown }>;
     };
 
     const supabase = getSupabaseServer(req, token);
@@ -153,6 +154,7 @@ export async function PATCH(
             status: post.status || "draft",
             scheduled_date: post.scheduledDate || null,
             published_at: post.publishedAt || null,
+            voice_consistency_score: post.voiceConsistency || null,
             updated_at: new Date().toISOString(),
           }).eq("id", post.id);
         } else {
@@ -170,6 +172,7 @@ export async function PATCH(
             status: post.status || "draft",
             scheduled_date: post.scheduledDate || null,
             published_at: post.publishedAt || null,
+            voice_consistency_score: post.voiceConsistency || null,
           });
         }
       }

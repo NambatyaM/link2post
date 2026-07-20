@@ -78,6 +78,12 @@ export const POSTS_PROMPT = `You are an expert LinkedIn post writer. Generate po
 8. No emojis unless voice profile includes them.
 9. First person voice. Never reference "the video" or "the podcast".
 10. One specific image prompt per post (visual subject, lighting, camera angle, mood, --ar 16:9).
+11. For each post, score how well it matches the VOICE PROFILE on a scale of 1-10:
+    - toneMatch: how closely does the tone match the voice profile tones?
+    - vocabularyMatch: does it use the vocabulary traits and common phrases?
+    - formattingMatch: does it follow the formatting styles and sentence length?
+    - storytellingMatch: does it reflect the speaker's energy and signature patterns?
+    - overall: average of the above
 
 Return ONLY valid JSON:
 {
@@ -90,7 +96,14 @@ Return ONLY valid JSON:
       "viralityScore": 8,
       "authorityScore": 7,
       "commentPotential": 6,
-      "readabilityScore": 9
+      "readabilityScore": 9,
+      "voiceConsistency": {
+        "toneMatch": 9,
+        "vocabularyMatch": 8,
+        "formattingMatch": 7,
+        "storytellingMatch": 9,
+        "overall": 8
+      }
     }
   ]
 }`;

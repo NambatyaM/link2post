@@ -24,6 +24,7 @@ describe("savePosts", () => {
         image_prompt: "An image",
         status: "scheduled",
         scheduled_date: expect.any(String),
+        voice_consistency_score: null,
       }),
     ]);
   });

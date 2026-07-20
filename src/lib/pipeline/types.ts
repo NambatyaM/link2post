@@ -11,6 +11,13 @@ export interface PostsResult {
   posts: Array<{
     hook: string; body: string; imagePrompt: string; postType: string;
     viralityScore: number; authorityScore: number; commentPotential: number; readabilityScore: number;
+    voiceConsistency?: {
+      toneMatch: number;
+      vocabularyMatch: number;
+      formattingMatch: number;
+      storytellingMatch: number;
+      overall: number;
+    };
   }>;
 }
 
@@ -25,4 +32,11 @@ export type CallAIResult = { content: string; provider: string; model: string; l
 export interface PostRow {
   hook: string; body: string; imagePrompt: string; postType?: string;
   viralityScore?: number; authorityScore?: number; commentPotential?: number; readabilityScore?: number;
+  voiceConsistency?: {
+    toneMatch: number;
+    vocabularyMatch: number;
+    formattingMatch: number;
+    storytellingMatch: number;
+    overall: number;
+  };
 }

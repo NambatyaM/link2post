@@ -25,6 +25,7 @@ export async function savePosts(
     comment_potential: p.commentPotential ?? 0, readability_score: p.readabilityScore ?? 0,
     image_prompt: p.imagePrompt, status: "scheduled",
     scheduled_date: getUpcomingWeekday(i),
+    voice_consistency_score: p.voiceConsistency || null,
   }));
   const { error } = await supabase.from("posts").insert(rows);
   if (error) {
