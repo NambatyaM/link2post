@@ -10,7 +10,6 @@ import {
   type CarouselTemplate,
   type CarouselFormat,
 } from "@/lib/templates";
-import SlideRenderer from "@/components/SlideRenderer";
 
 interface CarouselEditorProps {
   initialSlides: CarouselSlide[];
@@ -20,14 +19,91 @@ interface CarouselEditorProps {
 
 type DesignTab = "themes" | "colors" | "fonts" | "backgrounds";
 
-const BG_PATTERNS: Record<string, string> = {
-  solid: "",
-  gradient: "linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(168,85,247,0.15) 100%)",
-  mesh: "radial-gradient(at 40% 20%, rgba(99,102,241,0.2) 0%, transparent 50%), radial-gradient(at 80% 80%, rgba(168,85,247,0.15) 0%, transparent 50%)",
-  dots: "radial-gradient(circle, rgba(255,255,255,0.08) 1px, transparent 1px)",
-  lines: "repeating-linear-gradient(0deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 20px)",
-  grid: "linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px)",
+const BG_PATTERNS: Record<string, { css: string; size?: string }> = {
+  solid: { css: "" },
+  gradient: { css: "linear-gradient(135deg, rgba(99,102,241,0.2) 0%, rgba(168,85,247,0.2) 100%)" },
+  mesh: { css: "radial-gradient(at 40% 20%, rgba(99,102,241,0.25) 0%, transparent 50%), radial-gradient(at 80% 80%, rgba(168,85,247,0.2) 0%, transparent 50%)" },
+  dots: {
+    css: "radial-gradient(circle, rgba(255,255,255,0.18) 1.5px, transparent 1.5px)",
+    size: "20px 20px",
+  },
+  lines: {
+    css: "repeating-linear-gradient(0deg, rgba(255,255,255,0.08) 0px, rgba(255,255,255,0.08) 1px, transparent 1px, transparent 24px)",
+    size: "24px 24px",
+  },
+  grid: {
+    css: "linear-gradient(rgba(255,255,255,0.07) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.07) 1px, transparent 1px)",
+    size: "24px 24px",
+  },
+  waves: {
+    css: "url(\"data:image/svg+xml,%3Csvg width='100' height='20' viewBox='0 0 100 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 10 Q25 0 50 10 T100 10' fill='none' stroke='rgba(255,255,255,0.12)' stroke-width='1.5'/%3E%3C/svg%3E\")",
+    size: "100px 20px",
+  },
+  chevrons: {
+    css: "url(\"data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M10 30 L20 20 L30 30' fill='none' stroke='rgba(255,255,255,0.1)' stroke-width='1.5'/%3E%3C/svg%3E\")",
+    size: "40px 40px",
+  },
+  circles: {
+    css: "url(\"data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='30' cy='30' r='18' fill='none' stroke='rgba(255,255,255,0.08)' stroke-width='1.5'/%3E%3C/svg%3E\")",
+    size: "60px 60px",
+  },
+  triangles: {
+    css: "url(\"data:image/svg+xml,%3Csvg width='48' height='42' viewBox='0 0 48 42' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M24 4 L44 38 L4 38 Z' fill='none' stroke='rgba(255,255,255,0.09)' stroke-width='1.2'/%3E%3C/svg%3E\")",
+    size: "48px 42px",
+  },
+  diagonal: {
+    css: "repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 1px, transparent 1px, transparent 16px)",
+    size: "22px 22px",
+  },
+  diamonds: {
+    css: "url(\"data:image/svg+xml,%3Csvg width='40' height='40' viewBox='0 0 40 40' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M20 4 L36 20 L20 36 L4 20 Z' fill='none' stroke='rgba(255,255,255,0.1)' stroke-width='1.2'/%3E%3C/svg%3E\")",
+    size: "40px 40px",
+  },
+  crosses: {
+    css: "url(\"data:image/svg+xml,%3Csvg width='24' height='24' viewBox='0 0 24 24' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12 6v12M6 12h12' stroke='rgba(255,255,255,0.1)' stroke-width='1'/%3E%3C/svg%3E\")",
+    size: "24px 24px",
+  },
+  hexagons: {
+    css: "url(\"data:image/svg+xml,%3Csvg width='56' height='100' viewBox='0 0 56 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M28 66L0 50L0 16L28 0L56 16L56 50L28 66L28 100' fill='none' stroke='rgba(255,255,255,0.07)' stroke-width='1.2'/%3E%3Cpath d='M28 0L28 34L0 50L0 84L28 100L56 84L56 50L28 34' fill='none' stroke='rgba(255,255,255,0.07)' stroke-width='1.2'/%3E%3C/svg%3E\")",
+    size: "56px 100px",
+  },
+  zigzag: {
+    css: "url(\"data:image/svg+xml,%3Csvg width='40' height='20' viewBox='0 0 40 20' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 15 L10 5 L20 15 L30 5 L40 15' fill='none' stroke='rgba(255,255,255,0.1)' stroke-width='1.2'/%3E%3C/svg%3E\")",
+    size: "40px 20px",
+  },
+  stars: {
+    css: "url(\"data:image/svg+xml,%3Csvg width='28' height='28' viewBox='0 0 28 28' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M14 2l3 8h8l-6.5 5 2.5 8L14 18l-7 5 2.5-8L3 10h8z' fill='none' stroke='rgba(255,255,255,0.09)' stroke-width='1'/%3E%3C/svg%3E\")",
+    size: "28px 28px",
+  },
+  dotsLarge: {
+    css: "radial-gradient(circle, rgba(255,255,255,0.15) 3px, transparent 3px)",
+    size: "32px 32px",
+  },
+  bubbles: {
+    css: "url(\"data:image/svg+xml,%3Csvg width='80' height='80' viewBox='0 0 80 80' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='20' cy='20' r='12' fill='none' stroke='rgba(255,255,255,0.07)' stroke-width='1'/%3E%3Ccircle cx='60' cy='55' r='8' fill='none' stroke='rgba(255,255,255,0.06)' stroke-width='1'/%3E%3Ccircle cx='45' cy='10' r='5' fill='none' stroke='rgba(255,255,255,0.05)' stroke-width='1'/%3E%3C/svg%3E\")",
+    size: "80px 80px",
+  },
+  abstract1: {
+    css: "url(\"data:image/svg+xml,%3Csvg width='120' height='120' viewBox='0 0 120 120' xmlns='http://www.w3.org/2000/svg'%3E%3Ccircle cx='30' cy='30' r='25' fill='none' stroke='rgba(255,255,255,0.06)' stroke-width='1'/%3E%3Crect x='70' y='60' width='40' height='40' rx='8' fill='none' stroke='rgba(255,255,255,0.05)' stroke-width='1' transform='rotate(15 90 80)'/%3E%3Cpath d='M60 10 L110 50' stroke='rgba(255,255,255,0.04)' stroke-width='1'/%3E%3C/svg%3E\")",
+    size: "120px 120px",
+  },
+  dotsSparse: {
+    css: "radial-gradient(circle, rgba(255,255,255,0.2) 2px, transparent 2px)",
+    size: "48px 48px",
+  },
+  horizontalLines: {
+    css: "repeating-linear-gradient(0deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 2px, transparent 2px, transparent 40px)",
+    size: "40px 40px",
+  },
+  verticalLines: {
+    css: "repeating-linear-gradient(90deg, rgba(255,255,255,0.06) 0px, rgba(255,255,255,0.06) 2px, transparent 2px, transparent 40px)",
+    size: "40px 40px",
+  },
 };
+
+function getBgStyle(bgStyle: string) {
+  return BG_PATTERNS[bgStyle] || BG_PATTERNS.solid;
+}
 
 export default function CarouselEditor({ initialSlides, projectTitle, onExport }: CarouselEditorProps) {
   const [slides, setSlides] = useState<CarouselSlide[]>(initialSlides);
@@ -93,14 +169,172 @@ export default function CarouselEditor({ initialSlides, projectTitle, onExport }
 
   const currentFont = fontPair;
 
+  const renderSlideContent = useCallback((slide: CarouselSlide, i: number, isExport: boolean) => {
+    const w = format.width;
+    const h = format.height;
+    const bg = getBgStyle(bgStyle);
+
+    return (
+      <div
+        style={{
+          width: isExport ? w : w * 0.55,
+          height: isExport ? h : h * 0.55,
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: template.borderRadius,
+          boxShadow: isExport ? "none" : "0 8px 32px rgba(0,0,0,0.3)",
+        }}
+      >
+        <div
+          style={{
+            width: w,
+            height: h,
+            transform: isExport ? "none" : "scale(0.55)",
+            transformOrigin: "top left",
+            background: template.colors.background,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            padding: w * 0.074,
+            fontFamily: currentFont.heading,
+            position: "relative",
+            overflow: "hidden",
+            borderRadius: template.borderRadius,
+          }}
+        >
+          {bg.css && (
+            <div style={{ position: "absolute", inset: 0, background: bg.css, backgroundSize: bg.size || "auto", pointerEvents: "none" }} />
+          )}
+
+          <div style={{ position: "absolute", top: w * 0.037, left: w * 0.037, fontSize: w * 0.013, fontWeight: 600, color: template.colors.accent, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            {slide.slideNumber} / {slides.length}
+          </div>
+
+          {i === 0 && !isExport && (
+            <div style={{ position: "absolute", top: w * 0.037, right: w * 0.037, fontSize: w * 0.011, color: `${template.colors.title}40` }}>
+              Swipe to read →
+            </div>
+          )}
+
+          {!isExport && editingTitle === i ? (
+            <textarea
+              autoFocus
+              value={slide.title}
+              onChange={(e) => updateSlide(i, "title", e.target.value)}
+              onBlur={() => setEditingTitle(null)}
+              onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); setEditingTitle(null); } }}
+              style={{
+                fontSize: i === 0 ? w * 0.048 : w * 0.037,
+                fontWeight: 800,
+                color: template.colors.title,
+                textAlign: "center",
+                lineHeight: 1.2,
+                maxWidth: w * 0.74,
+                background: "rgba(255,255,255,0.05)",
+                border: `1px solid ${template.colors.accent}`,
+                borderRadius: 4,
+                padding: 4,
+                resize: "none",
+                fontFamily: currentFont.heading,
+                outline: "none",
+              }}
+            />
+          ) : (
+            <h2
+              {...(!isExport ? { onClick: () => setEditingTitle(i) } : {})}
+              style={{
+                fontSize: i === 0 ? w * 0.048 : w * 0.037,
+                fontWeight: 800,
+                color: template.colors.title,
+                textAlign: "center",
+                lineHeight: 1.2,
+                marginBottom: w * 0.022,
+                maxWidth: w * 0.74,
+                wordBreak: "break-word",
+                cursor: isExport ? "default" : "text",
+                padding: "4px 8px",
+                borderRadius: 4,
+              }}
+            >
+              {slide.title}
+            </h2>
+          )}
+
+          {!isExport && editingBody === i ? (
+            <textarea
+              autoFocus
+              value={slide.body}
+              onChange={(e) => updateSlide(i, "body", e.target.value)}
+              onBlur={() => setEditingBody(null)}
+              style={{
+                fontSize: w * 0.022,
+                color: template.colors.body,
+                textAlign: "center",
+                lineHeight: 1.6,
+                maxWidth: w * 0.69,
+                background: "rgba(255,255,255,0.05)",
+                border: `1px solid ${template.colors.accent}`,
+                borderRadius: 4,
+                padding: 4,
+                resize: "none",
+                fontFamily: currentFont.body,
+                outline: "none",
+                minHeight: 80,
+              }}
+            />
+          ) : (
+            <div
+              {...(!isExport ? { onClick: () => setEditingBody(i) } : {})}
+              style={{
+                fontSize: w * 0.022,
+                color: template.colors.body,
+                textAlign: "center",
+                lineHeight: 1.6,
+                maxWidth: w * 0.69,
+                wordBreak: "break-word",
+                cursor: isExport ? "default" : "text",
+                padding: "4px 8px",
+                borderRadius: 4,
+              }}
+            >
+              {slide.body}
+            </div>
+          )}
+
+          {i === slides.length - 1 && (
+            <div style={{ marginTop: w * 0.037, padding: `${w * 0.015}px ${w * 0.03}px`, background: template.colors.accent, borderRadius: template.borderRadius, fontSize: w * 0.019, fontWeight: 600, color: template.colors.accentText }}>
+              Follow for more
+            </div>
+          )}
+
+          <div style={{ position: "absolute", bottom: w * 0.037, left: w * 0.037, right: w * 0.037, height: 3, background: `${template.colors.accent} ${(slide.slideNumber / slides.length) * 100}%, ${template.colors.progressBg} ${(slide.slideNumber / slides.length) * 100}%`, borderRadius: 2 }} />
+        </div>
+      </div>
+    );
+  }, [format, template, currentFont, bgStyle, slides.length, editingTitle, editingBody, updateSlide]);
+
   const exportSlides = useCallback(async () => {
     if (!canvasRef.current) return;
+
+    const btn = canvasRef.current.closest("[data-carousel-root]");
+    if (btn) btn.setAttribute("data-exporting", "true");
+
+    const slideEls = canvasRef.current.querySelectorAll("[data-slide-export]");
+    for (const el of slideEls) {
+      (el as HTMLElement).style.display = "block";
+      (el as HTMLElement).style.position = "absolute";
+      (el as HTMLElement).style.left = "-9999px";
+      (el as HTMLElement).style.top = "0";
+    }
+
+    await new Promise((r) => setTimeout(r, 100));
+
     const { default: html2canvas } = await import("html2canvas-pro");
     const { default: jsPDF } = await import("jspdf");
 
     const pdf = new jsPDF({ orientation: "portrait", unit: "px", format: [format.width, format.height] });
 
-    const slideEls = canvasRef.current.querySelectorAll("[data-slide-export]");
     for (let i = 0; i < slideEls.length; i++) {
       const el = slideEls[i] as HTMLElement;
       const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: null });
@@ -109,12 +343,21 @@ export default function CarouselEditor({ initialSlides, projectTitle, onExport }
       pdf.addImage(imgData, "PNG", 0, 0, format.width, format.height);
     }
 
+    for (const el of slideEls) {
+      (el as HTMLElement).style.display = "";
+      (el as HTMLElement).style.position = "";
+      (el as HTMLElement).style.left = "";
+      (el as HTMLElement).style.top = "";
+    }
+
+    if (btn) btn.removeAttribute("data-exporting");
+
     pdf.save(`${projectTitle || "carousel"}-slides.pdf`);
     onExport?.();
   }, [format, projectTitle, onExport]);
 
   return (
-    <div className="flex h-screen" style={{ background: "var(--bg-primary)" }}>
+    <div data-carousel-root className="flex h-screen" style={{ background: "var(--bg-primary)" }}>
       {/* LEFT PANEL — Slide thumbnails */}
       <div
         className="flex flex-col shrink-0 border-r overflow-hidden"
@@ -129,76 +372,79 @@ export default function CarouselEditor({ initialSlides, projectTitle, onExport }
         </div>
 
         <div className="flex-1 overflow-y-auto py-2 px-2 flex flex-col gap-2">
-          {slides.map((slide, i) => (
-            <div
-              key={i}
-              onClick={() => setActiveSlide(i)}
-              className="relative group cursor-pointer rounded-lg overflow-hidden transition-all"
-              style={{
-                border: activeSlide === i ? `2px solid ${template.colors.accent}` : "2px solid transparent",
-                opacity: activeSlide === i ? 1 : 0.7,
-              }}
-            >
-              <div className="pointer-events-none" style={{ transform: "scale(0.2)", transformOrigin: "top left", width: format.width, height: format.height }}>
-                <div
-                  style={{
-                    width: format.width,
-                    height: format.height,
-                    background: template.colors.background.includes("gradient") ? template.colors.background : template.colors.background,
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    padding: format.width * 0.074,
-                    fontFamily: currentFont.heading,
-                  }}
-                >
-                  {bgStyle !== "solid" && (
-                    <div className="absolute inset-0" style={{ background: BG_PATTERNS[bgStyle], backgroundSize: bgStyle === "dots" ? "16px 16px" : undefined }} />
-                  )}
-                  <h2 style={{ fontSize: format.width * 0.048, fontWeight: 800, color: template.colors.title, textAlign: "center", lineHeight: 1.2, maxWidth: format.width * 0.7 }}>
-                    {slide.title}
-                  </h2>
-                </div>
-              </div>
-
-              <div className="absolute bottom-1 left-1 flex items-center gap-1">
-                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}>
-                  {i + 1}
-                </span>
-              </div>
-
-              {slides.length > 1 && (
-                <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
-                  {i > 0 && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); moveSlide(i, i - 1); }}
-                      className="w-5 h-5 rounded flex items-center justify-center text-[10px]"
-                      style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}
-                    >
-                      ↑
-                    </button>
-                  )}
-                  {i < slides.length - 1 && (
-                    <button
-                      onClick={(e) => { e.stopPropagation(); moveSlide(i, i + 1); }}
-                      className="w-5 h-5 rounded flex items-center justify-center text-[10px]"
-                      style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}
-                    >
-                      ↓
-                    </button>
-                  )}
-                  <button
-                    onClick={(e) => { e.stopPropagation(); deleteSlide(i); }}
-                    className="w-5 h-5 rounded flex items-center justify-center text-[10px]"
-                    style={{ background: "rgba(239,68,68,0.8)", color: "#fff" }}
+          {slides.map((slide, i) => {
+            const bg = getBgStyle(bgStyle);
+            return (
+              <div
+                key={i}
+                onClick={() => setActiveSlide(i)}
+                className="relative group cursor-pointer rounded-lg overflow-hidden transition-all"
+                style={{
+                  border: activeSlide === i ? `2px solid ${template.colors.accent}` : "2px solid transparent",
+                  opacity: activeSlide === i ? 1 : 0.7,
+                }}
+              >
+                <div className="pointer-events-none" style={{ transform: "scale(0.2)", transformOrigin: "top left", width: format.width, height: format.height }}>
+                  <div
+                    style={{
+                      width: format.width,
+                      height: format.height,
+                      background: template.colors.background,
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      padding: format.width * 0.074,
+                      fontFamily: currentFont.heading,
+                      position: "relative",
+                      overflow: "hidden",
+                    }}
                   >
-                    ×
-                  </button>
+                    {bg.css && <div className="absolute inset-0" style={{ background: bg.css, backgroundSize: bg.size || "auto" }} />}
+                    <h2 style={{ fontSize: format.width * 0.048, fontWeight: 800, color: template.colors.title, textAlign: "center", lineHeight: 1.2, maxWidth: format.width * 0.7 }}>
+                      {slide.title}
+                    </h2>
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
+
+                <div className="absolute bottom-1 left-1 flex items-center gap-1">
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}>
+                    {i + 1}
+                  </span>
+                </div>
+
+                {slides.length > 1 && (
+                  <div className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity flex gap-0.5">
+                    {i > 0 && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); moveSlide(i, i - 1); }}
+                        className="w-5 h-5 rounded flex items-center justify-center text-[10px]"
+                        style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}
+                      >
+                        ↑
+                      </button>
+                    )}
+                    {i < slides.length - 1 && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); moveSlide(i, i + 1); }}
+                        className="w-5 h-5 rounded flex items-center justify-center text-[10px]"
+                        style={{ background: "rgba(0,0,0,0.6)", color: "#fff" }}
+                      >
+                        ↓
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); deleteSlide(i); }}
+                      className="w-5 h-5 rounded flex items-center justify-center text-[10px]"
+                      style={{ background: "rgba(239,68,68,0.8)", color: "#fff" }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
@@ -243,155 +489,7 @@ export default function CarouselEditor({ initialSlides, projectTitle, onExport }
                   display: i === activeSlide ? "block" : "none",
                 }}
               >
-                <div
-                  style={{
-                    width: format.width * 0.55,
-                    height: format.height * 0.55,
-                    position: "relative",
-                    overflow: "hidden",
-                    borderRadius: template.borderRadius,
-                    boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
-                  }}
-                >
-                  <div
-                    style={{
-                      width: format.width,
-                      height: format.height,
-                      transform: "scale(0.55)",
-                      transformOrigin: "top left",
-                      background: template.colors.background.includes("gradient") ? template.colors.background : template.colors.background,
-                      display: "flex",
-                      flexDirection: "column",
-                      justifyContent: "center",
-                      alignItems: "center",
-                      padding: format.width * 0.074,
-                      fontFamily: currentFont.heading,
-                      position: "relative",
-                      overflow: "hidden",
-                      borderRadius: template.borderRadius,
-                    }}
-                  >
-                    {/* Background pattern overlay */}
-                    {bgStyle !== "solid" && (
-                      <div style={{ position: "absolute", inset: 0, background: BG_PATTERNS[bgStyle], backgroundSize: bgStyle === "dots" ? "16px 16px" : undefined, pointerEvents: "none" }} />
-                    )}
-
-                    {/* Slide number */}
-                    <div style={{ position: "absolute", top: format.width * 0.037, left: format.width * 0.037, fontSize: format.width * 0.013, fontWeight: 600, color: template.colors.accent, letterSpacing: "0.05em", textTransform: "uppercase" }}>
-                      {slide.slideNumber} / {slides.length}
-                    </div>
-
-                    {/* Swipe hint on first slide */}
-                    {i === 0 && (
-                      <div style={{ position: "absolute", top: format.width * 0.037, right: format.width * 0.037, fontSize: format.width * 0.011, color: `${template.colors.title}40` }}>
-                        Swipe to read →
-                      </div>
-                    )}
-
-                    {/* Title — editable */}
-                    {editingTitle === i ? (
-                      <textarea
-                        autoFocus
-                        value={slide.title}
-                        onChange={(e) => updateSlide(i, "title", e.target.value)}
-                        onBlur={() => setEditingTitle(null)}
-                        onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); setEditingTitle(null); } }}
-                        style={{
-                          fontSize: i === 0 ? format.width * 0.048 : format.width * 0.037,
-                          fontWeight: 800,
-                          color: template.colors.title,
-                          textAlign: "center",
-                          lineHeight: 1.2,
-                          maxWidth: format.width * 0.74,
-                          background: "rgba(255,255,255,0.05)",
-                          border: `1px solid ${template.colors.accent}`,
-                          borderRadius: 4,
-                          padding: 4,
-                          resize: "none",
-                          fontFamily: currentFont.heading,
-                          outline: "none",
-                        }}
-                      />
-                    ) : (
-                      <h2
-                        onClick={() => setEditingTitle(i)}
-                        style={{
-                          fontSize: i === 0 ? format.width * 0.048 : format.width * 0.037,
-                          fontWeight: 800,
-                          color: template.colors.title,
-                          textAlign: "center",
-                          lineHeight: 1.2,
-                          marginBottom: format.width * 0.022,
-                          maxWidth: format.width * 0.74,
-                          wordBreak: "break-word",
-                          cursor: "text",
-                          padding: "4px 8px",
-                          borderRadius: 4,
-                          transition: "background 0.15s",
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                      >
-                        {slide.title}
-                      </h2>
-                    )}
-
-                    {/* Body — editable */}
-                    {editingBody === i ? (
-                      <textarea
-                        autoFocus
-                        value={slide.body}
-                        onChange={(e) => updateSlide(i, "body", e.target.value)}
-                        onBlur={() => setEditingBody(null)}
-                        style={{
-                          fontSize: format.width * 0.022,
-                          color: template.colors.body,
-                          textAlign: "center",
-                          lineHeight: 1.6,
-                          maxWidth: format.width * 0.69,
-                          background: "rgba(255,255,255,0.05)",
-                          border: `1px solid ${template.colors.accent}`,
-                          borderRadius: 4,
-                          padding: 4,
-                          resize: "none",
-                          fontFamily: currentFont.body,
-                          outline: "none",
-                          minHeight: 80,
-                        }}
-                      />
-                    ) : (
-                      <div
-                        onClick={() => setEditingBody(i)}
-                        style={{
-                          fontSize: format.width * 0.022,
-                          color: template.colors.body,
-                          textAlign: "center",
-                          lineHeight: 1.6,
-                          maxWidth: format.width * 0.69,
-                          wordBreak: "break-word",
-                          cursor: "text",
-                          padding: "4px 8px",
-                          borderRadius: 4,
-                          transition: "background 0.15s",
-                        }}
-                        onMouseEnter={(e) => { e.currentTarget.style.background = "rgba(255,255,255,0.03)"; }}
-                        onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
-                      >
-                        {slide.body}
-                      </div>
-                    )}
-
-                    {/* CTA on last slide */}
-                    {i === slides.length - 1 && (
-                      <div style={{ marginTop: format.width * 0.037, padding: `${format.width * 0.015}px ${format.width * 0.03}px`, background: template.colors.accent, borderRadius: template.borderRadius, fontSize: format.width * 0.019, fontWeight: 600, color: template.colors.accentText }}>
-                        Follow for more
-                      </div>
-                    )}
-
-                    {/* Progress bar */}
-                    <div style={{ position: "absolute", bottom: format.width * 0.037, left: format.width * 0.037, right: format.width * 0.037, height: 3, background: `${template.colors.accent} ${(slide.slideNumber / slides.length) * 100}%, ${template.colors.progressBg} ${(slide.slideNumber / slides.length) * 100}%`, borderRadius: 2 }} />
-                  </div>
-                </div>
+                {renderSlideContent(slide, i, false)}
               </div>
             ))}
           </div>
@@ -553,13 +651,13 @@ export default function CarouselEditor({ initialSlides, projectTitle, onExport }
           )}
 
           {designTab === "backgrounds" && (
-            <div className="flex flex-col gap-3">
-              <p className="text-[10px] font-medium uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Background Style</p>
-              {Object.entries(BG_PATTERNS).map(([key, value]) => (
+            <div className="flex flex-col gap-2">
+              <p className="text-[10px] font-medium uppercase tracking-wider mb-1" style={{ color: "var(--text-muted)" }}>Background Style</p>
+              {Object.entries(BG_PATTERNS).map(([key, bg]) => (
                 <button
                   key={key}
                   onClick={() => setBgStyle(key)}
-                  className="p-3 rounded-lg transition-all text-left flex items-center gap-3"
+                  className="p-2.5 rounded-lg transition-all text-left flex items-center gap-3"
                   style={{
                     background: bgStyle === key ? "rgba(129,140,248,0.1)" : "var(--bg-tertiary)",
                     border: bgStyle === key ? "1px solid var(--accent)" : "1px solid transparent",
@@ -573,7 +671,7 @@ export default function CarouselEditor({ initialSlides, projectTitle, onExport }
                       overflow: "hidden",
                     }}
                   >
-                    {value && <div className="absolute inset-0" style={{ background: value, backgroundSize: key === "dots" ? "4px 4px" : undefined }} />}
+                    {bg.css && <div className="absolute inset-0" style={{ background: bg.css, backgroundSize: bg.size || "auto" }} />}
                   </div>
                   <span className="text-[11px] font-medium capitalize" style={{ color: "var(--text-primary)" }}>{key}</span>
                 </button>
