@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
 
     const { data: projects, error: projectsError } = await supabase
       .from("projects")
-      .select("id, user_id, title, raw_transcript, status, niche, audience, goals, created_at")
+      .select("id, user_id, title, status, niche, audience, goals, created_at")
       .eq("user_id", user.userId)
       .order("created_at", { ascending: false });
 
@@ -51,7 +51,6 @@ export async function GET(req: NextRequest) {
       id: p.id,
       userId: p.user_id,
       title: p.title,
-      rawTranscript: p.raw_transcript,
       niche: p.niche,
       audience: p.audience,
       goals: p.goals,
@@ -99,7 +98,10 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    return Response.json({ projects: mapped, posts });
+    return Response.json(
+      { projects: mapped, posts },
+      { headers: { "Cache-Control": "private, max-age=60" } },
+    );
   } catch (error) {
     console.error("Projects list error:", error);
     return Response.json({ error: "Something went wrong" }, { status: 500 });

@@ -17,7 +17,7 @@ export async function GET(
 
     const { data: project, error: projectError } = await supabase
       .from("projects")
-      .select("id, user_id, title, raw_transcript, status, niche, audience, goals, carousel_slides, created_at")
+      .select("id, user_id, title, status, niche, audience, goals, created_at")
       .eq("id", id)
       .eq("user_id", user.userId)
       .single();
@@ -42,11 +42,9 @@ export async function GET(
       id: project.id,
       userId: project.user_id,
       title: project.title,
-      rawTranscript: project.raw_transcript,
       niche: project.niche,
       audience: project.audience,
       goals: project.goals,
-      carouselSlides: project.carousel_slides,
       status: project.status,
       createdAt: project.created_at,
     };
@@ -72,7 +70,10 @@ export async function GET(
       voiceConsistency: p.voice_consistency_score,
     }));
 
-    return Response.json({ project: mappedProject, posts: mappedPosts });
+    return Response.json(
+      { project: mappedProject, posts: mappedPosts },
+      { headers: { "Cache-Control": mappedProject.status === "completed" ? "private, max-age=300" : "no-store" } },
+    );
   } catch (error) {
     console.error("Project get error:", error);
     return Response.json({ error: "Something went wrong" }, { status: 500 });
