@@ -3,14 +3,9 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import { usePlan } from "@/components/providers/PlanProvider";
 
 type Tab = "profile" | "voice" | "billing";
-
-const TABS: { id: Tab; label: string }[] = [
-  { id: "profile", label: "Profile" },
-  { id: "voice", label: "Voice Profile" },
-  { id: "billing", label: "Billing" },
-];
 
 interface UserProfile {
   firstName: string;
@@ -47,21 +42,33 @@ const MOCK_VOICE: VoiceData = {
   favoriteEmojis: ["💡", "🔥", "🚀", "✅"],
 };
 
-const PLANS = [
-  { name: "Free", price: "$0", features: ["5 projects/month", "Basic templates"], current: true },
-  { name: "Pro", price: "$15/mo", features: ["Unlimited projects", "Voice profiling", "Calendar scheduling"], current: false },
-  { name: "Business", price: "$49/mo", features: ["Team seats", "Custom branding", "API access", "Dedicated support"], current: false },
+const BILLING_PLANS = [
+  { name: "Free", price: "$0", features: ["1 project/month", "5 posts/month", "Basic carousel", "TXT export"] },
+  { name: "Starter", price: "$19/mo", features: ["10 projects/month", "50 posts/month", "Brand voice profiling", "Full carousel editor", "All export formats", "Priority generation"] },
+  { name: "Pro", price: "$49/mo", features: ["Unlimited projects", "Unlimited posts", "Advanced analytics", "Multi-voice profiles", "API access", "Team collaboration (3 seats)", "Dedicated support"] },
 ];
 
 export default function SettingsPage() {
   const router = useRouter();
+  const { plan } = usePlan();
+  const isPaid = plan === "starter" || plan === "pro";
+
+  const ALL_TABS: { id: Tab; label: string }[] = [
+    { id: "profile", label: "Profile" },
+    { id: "voice", label: "Voice Profile" },
+    { id: "billing", label: "Billing" },
+  ];
+
+  const TABS = ALL_TABS.filter((tab) => {
+    if (tab.id === "voice" && !isPaid) return false;
+    return true;
+  });
+
   const [activeTab, setActiveTab] = useState<Tab>("profile");
   const [profile, setProfile] = useState<UserProfile>({ firstName: "", lastName: "", email: "", linkedinUrl: "" });
   const [voice, setVoice] = useState<VoiceData | null>(null);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [projectsUsed] = useState(3);
-  const [projectsLimit] = useState(5);
 
   useEffect(() => {
     async function loadProfile() {
@@ -456,75 +463,76 @@ export default function SettingsPage() {
                   Current Plan
                 </span>
                 <span className="text-sm ml-2" style={{ color: "var(--accent)" }}>
-                  Free
+                  {plan === "pro" ? "Pro" : plan === "starter" ? "Starter" : "Free"}
                 </span>
               </div>
-              <span className="text-xs" style={{ color: "var(--text-muted)" }}>
-                {projectsUsed} / {projectsLimit} projects used
-              </span>
-            </div>
-
-            <div>
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-tertiary)" }}>
-                <div
-                  className="h-full rounded-full"
-                  style={{
-                    background: "var(--accent)",
-                    width: `${Math.min((projectsUsed / projectsLimit) * 100, 100)}%`,
-                  }}
-                />
-              </div>
-              <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                {projectsLimit - projectsUsed} projects remaining this month
-              </p>
+              {!isPaid && (
+                <button
+                  onClick={() => router.push("/pricing")}
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg"
+                  style={{ background: "var(--accent)", color: "white" }}
+                >
+                  Upgrade
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-2">
-              {PLANS.map((plan) => (
-                <div
-                  key={plan.name}
-                  className="rounded-lg p-4 flex flex-col gap-3"
-                  style={{
-                    background: "var(--bg-tertiary)",
-                    border: `1px solid ${plan.current ? "var(--accent)" : "var(--border)"}`,
-                  }}
-                >
-                  <div>
-                    <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
-                      {plan.name}
-                    </span>
-                    <span className="text-sm ml-2 font-bold" style={{ color: "var(--text-primary)" }}>
-                      {plan.price}
-                    </span>
+              {BILLING_PLANS.map((p) => {
+                const isCurrent = (p.name === "Free" && plan === "free") || (p.name === "Starter" && plan === "starter") || (p.name === "Pro" && plan === "pro");
+                return (
+                  <div
+                    key={p.name}
+                    className="rounded-lg p-4 flex flex-col gap-3"
+                    style={{
+                      background: "var(--bg-tertiary)",
+                      border: `1px solid ${isCurrent ? "var(--accent)" : "var(--border)"}`,
+                    }}
+                  >
+                    <div>
+                      <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>
+                        {p.name}
+                      </span>
+                      <span className="text-sm ml-2 font-bold" style={{ color: "var(--text-primary)" }}>
+                        {p.price}
+                      </span>
+                    </div>
+                    <ul className="flex flex-col gap-1">
+                      {p.features.map((f) => (
+                        <li key={f} className="text-xs flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                    {isCurrent ? (
+                      <span
+                        className="text-xs text-center py-1.5 rounded-md font-medium"
+                        style={{ background: "var(--bg-secondary)", color: "var(--text-muted)" }}
+                      >
+                        Current
+                      </span>
+                    ) : p.name === "Free" ? (
+                      <span
+                        className="text-xs text-center py-1.5 rounded-md font-medium"
+                        style={{ background: "var(--bg-secondary)", color: "var(--text-muted)" }}
+                      >
+                        Free Forever
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => router.push("/pricing")}
+                        className="text-xs text-center py-1.5 rounded-md font-medium transition-colors"
+                        style={{ background: "var(--accent)", color: "white" }}
+                      >
+                        Upgrade
+                      </button>
+                    )}
                   </div>
-                  <ul className="flex flex-col gap-1">
-                    {plan.features.map((f) => (
-                      <li key={f} className="text-xs flex items-center gap-1.5" style={{ color: "var(--text-muted)" }}>
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--success)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                        {f}
-                      </li>
-                    ))}
-                  </ul>
-                  {plan.current ? (
-                    <span
-                      className="text-xs text-center py-1.5 rounded-md font-medium"
-                      style={{ background: "var(--bg-secondary)", color: "var(--text-muted)" }}
-                    >
-                      Current
-                    </span>
-                  ) : (
-                    <button
-                      onClick={() => router.push("/beta")}
-                      className="text-xs text-center py-1.5 rounded-md font-medium transition-colors"
-                      style={{ background: "var(--accent)", color: "white" }}
-                    >
-                      Coming Soon
-                    </button>
-                  )}
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

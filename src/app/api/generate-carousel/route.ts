@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { CAROUSEL_SYSTEM_PROMPT, buildCarouselPrompt } from "@/lib/prompts";
-import { checkRateLimit, getRateLimitHeaders, recordGeneration } from "@/lib/rate-limit";
+import { checkRateLimit, getRateLimitHeaders, recordGeneration, getUserPlan } from "@/lib/rate-limit";
 import { verifyToken, extractBearerToken } from "@/lib/auth";
 import { buildAttempts, fetchWithTimeout, recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
 import { generateLocalCarousel } from "@/lib/local-generator";
@@ -62,6 +62,13 @@ export async function POST(req: NextRequest) {
       const user = await verifyToken(token);
       if (user) {
         userId = user.userId;
+      }
+    }
+
+    if (userId) {
+      const plan = await getUserPlan(userId);
+      if (plan === "free") {
+        return Response.json({ error: "Carousel editor is a Starter feature. Upgrade at /pricing.", upgrade: true }, { status: 403 });
       }
     }
 

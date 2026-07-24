@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { extractBearerToken, verifyToken } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { getUserPlan } from "@/lib/rate-limit";
+import { checkMonthlyQuota } from "@/lib/features";
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,7 +29,7 @@ export async function GET(req: NextRequest) {
 
     const projectIds = (projects || []).map((p) => p.id);
 
-    let postCounts: Record<string, { total: number; draft: number; scheduled: number; published: number }> = {};
+    const postCounts: Record<string, { total: number; draft: number; scheduled: number; published: number }> = {};
     if (projectIds.length > 0) {
       const { data: counts } = await supabase
         .from("posts")
@@ -125,6 +127,15 @@ export async function POST(req: NextRequest) {
 
     if (!title || !transcript) {
       return Response.json({ error: "title and transcript are required" }, { status: 400 });
+    }
+
+    const plan = await getUserPlan(user.userId);
+    const quota = await checkMonthlyQuota(user.userId, "projects", plan);
+    if (!quota.allowed) {
+      return Response.json(
+        { error: "Project limit reached for this month. Upgrade your plan for more projects.", limit: quota.limit, used: quota.used, upgrade: true },
+        { status: 403 },
+      );
     }
 
     const supabase = getSupabaseServer(req, token);

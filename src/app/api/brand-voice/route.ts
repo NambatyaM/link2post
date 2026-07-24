@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { extractBearerToken, verifyToken } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
 import { storeMemory, stubEmbedding } from "@/lib/brand-voice";
+import { getUserPlan } from "@/lib/rate-limit";
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,6 +10,11 @@ export async function GET(req: NextRequest) {
     if (!token) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const user = await verifyToken(token);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+    const plan = await getUserPlan(user.userId);
+    if (plan === "free") {
+      return Response.json({ error: "Brand voice is a Starter feature. Upgrade at /pricing.", upgrade: true }, { status: 403 });
+    }
 
     const contentType = req.nextUrl.searchParams.get("content_type");
     const supabase = getSupabaseServer(req, token);
@@ -44,6 +50,11 @@ export async function POST(req: NextRequest) {
     const user = await verifyToken(token);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
+    const plan = await getUserPlan(user.userId);
+    if (plan === "free") {
+      return Response.json({ error: "Brand voice is a Starter feature. Upgrade at /pricing.", upgrade: true }, { status: 403 });
+    }
+
     const { contentType, contentText, metadata } = (await req.json()) as {
       contentType: string;
       contentText: string;
@@ -70,6 +81,11 @@ export async function DELETE(req: NextRequest) {
     if (!token) return Response.json({ error: "Unauthorized" }, { status: 401 });
     const user = await verifyToken(token);
     if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+    const plan = await getUserPlan(user.userId);
+    if (plan === "free") {
+      return Response.json({ error: "Brand voice is a Starter feature. Upgrade at /pricing.", upgrade: true }, { status: 403 });
+    }
 
     const { id } = (await req.json()) as { id: string };
     if (!id) {

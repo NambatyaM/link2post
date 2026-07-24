@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, use, useState, useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import type { CarouselSlide } from "@/lib/types";
+import { usePlan } from "@/components/providers/PlanProvider";
 import dynamic from "next/dynamic";
 
 const CarouselEditor = dynamic(() => import("@/components/CarouselEditor"), {
@@ -37,7 +38,7 @@ async function fetchProject(projectId: string): Promise<{ title: string; transcr
   }
 }
 
-async function generateSlides(transcript: string, projectId: string): Promise<CarouselSlide[]> {
+async function generateSlides(transcript: string): Promise<CarouselSlide[]> {
   const supabase = getSupabaseBrowser();
   const { data: { session } } = await supabase.auth.getSession();
 
@@ -65,6 +66,47 @@ async function generateSlides(transcript: string, projectId: string): Promise<Ca
 
 const STORAGE_KEY_PREFIX = "link2post_carousel_";
 
+function CarouselUpgradeWall() {
+  const router = useRouter();
+  return (
+    <div className="h-screen flex items-center justify-center" style={{ background: "var(--bg-primary)" }}>
+      <div className="text-center max-w-md mx-4">
+        <div
+          className="w-16 h-16 rounded-full mx-auto mb-6 flex items-center justify-center"
+          style={{ background: "rgba(99,102,241,0.1)", color: "var(--accent)" }}
+        >
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+          </svg>
+        </div>
+        <h2 className="text-xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
+          Carousel Editor is a Starter feature
+        </h2>
+        <p className="text-sm mb-6" style={{ color: "var(--text-muted)" }}>
+          Upgrade to Starter to unlock the full carousel editor with themes, fonts, and PDF export.
+        </p>
+        <div className="flex gap-3 justify-center">
+          <button
+            onClick={() => router.back()}
+            className="px-5 py-2.5 rounded-lg text-sm font-medium"
+            style={{ background: "var(--bg-secondary)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
+          >
+            Go Back
+          </button>
+          <button
+            onClick={() => router.push("/pricing")}
+            className="px-5 py-2.5 rounded-lg text-sm font-semibold"
+            style={{ background: "var(--accent)", color: "white" }}
+          >
+            View Plans
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function EditorPageContent({ projectId }: { projectId: string }) {
   const router = useRouter();
   const [slides, setSlides] = useState<CarouselSlide[]>([]);
@@ -74,63 +116,65 @@ function EditorPageContent({ projectId }: { projectId: string }) {
   const [generating, setGenerating] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // Auto-save to localStorage whenever slides change
   useEffect(() => {
     if (slides.length > 0) {
       localStorage.setItem(STORAGE_KEY_PREFIX + projectId, JSON.stringify(slides));
     }
   }, [slides, projectId]);
 
-  const loadAndGenerate = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError("");
-
-      // Check localStorage first
-      const cached = localStorage.getItem(STORAGE_KEY_PREFIX + projectId);
-      if (cached) {
-        try {
-          const parsed = JSON.parse(cached) as CarouselSlide[];
-          if (parsed.length > 0) {
-            setSlides(parsed);
-            setLoading(false);
-            return;
-          }
-        } catch { /* ignore corrupt cache */ }
-      }
-
-      const project = await fetchProject(projectId);
-      if (!project) {
-        setError("Project not found");
-        return;
-      }
-
-      setTitle(project.title);
-
-      if (!project.transcript || project.transcript.length < 100) {
-        setError("Transcript is too short to generate a carousel");
-        return;
-      }
-
-      setGenerating(true);
-      const generated = await generateSlides(project.transcript, projectId);
-      if (generated.length > 0) {
-        setSlides(generated);
-      } else {
-        setError("Failed to generate carousel slides");
-      }
-    } catch {
-      setError("Something went wrong");
-    } finally {
-      setLoading(false);
-      setGenerating(false);
-    }
-  }, [projectId]);
-
-  // Auto-load on mount
   useEffect(() => {
-    loadAndGenerate();
-  }, [loadAndGenerate]);
+    let cancelled = false;
+
+    async function load() {
+      try {
+        const cached = localStorage.getItem(STORAGE_KEY_PREFIX + projectId);
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached) as CarouselSlide[];
+            if (parsed.length > 0 && !cancelled) {
+              setSlides(parsed);
+              setLoading(false);
+              return;
+            }
+          } catch { /* ignore corrupt cache */ }
+        }
+
+        const project = await fetchProject(projectId);
+        if (cancelled) return;
+        if (!project) {
+          setError("Project not found");
+          return;
+        }
+
+        setTitle(project.title);
+
+        if (!project.transcript || project.transcript.length < 100) {
+          setError("Transcript is too short to generate a carousel");
+          return;
+        }
+
+        setGenerating(true);
+        const generated = await generateSlides(project.transcript);
+        if (cancelled) return;
+        if (generated.length > 0) {
+          setSlides(generated);
+        } else {
+          setError("Failed to generate carousel slides");
+        }
+      } catch {
+        if (!cancelled) setError("Something went wrong");
+      } finally {
+        if (!cancelled) {
+          setLoading(false);
+          setGenerating(false);
+        }
+      }
+    }
+
+    load();
+
+    return () => { cancelled = true; };
+  }, [projectId]);
 
   const handleSave = useCallback(async () => {
     try {
@@ -182,7 +226,7 @@ function EditorPageContent({ projectId }: { projectId: string }) {
               Go Back
             </button>
             <button
-              onClick={loadAndGenerate}
+              onClick={() => window.location.reload()}
               className="text-xs font-medium px-4 py-2 rounded-lg"
               style={{ background: "var(--accent)", color: "#fff" }}
             >
@@ -255,6 +299,8 @@ function EditorPageContent({ projectId }: { projectId: string }) {
 export default function CarouselEditorPage() {
   const params = useParams();
   const projectId = params.id as string;
+  const { plan } = usePlan();
+  const isPaid = plan === "starter" || plan === "pro";
 
   if (!projectId) {
     return (
@@ -262,6 +308,10 @@ export default function CarouselEditorPage() {
         <p className="text-sm" style={{ color: "var(--error)" }}>Invalid project ID</p>
       </div>
     );
+  }
+
+  if (!isPaid) {
+    return <CarouselUpgradeWall />;
   }
 
   return <EditorPageContent projectId={projectId} />;

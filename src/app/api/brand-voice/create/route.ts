@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { routeTask } from "@/services/ai";
 import { extractBearerToken, verifyToken } from "@/lib/auth";
 import { getSupabaseServer } from "@/lib/supabase-server";
+import { getUserPlan } from "@/lib/rate-limit";
 
 const VOICE_PROFILE_ANALYSIS_PROMPT = `You are an expert brand voice analyst. Analyze the following content and create a comprehensive Brand Voice Profile.
 
@@ -48,6 +49,13 @@ export async function POST(req: NextRequest) {
     if (token) {
       const user = await verifyToken(token);
       if (user) userId = user.userId;
+    }
+
+    if (userId) {
+      const plan = await getUserPlan(userId);
+      if (plan === "free") {
+        return Response.json({ error: "Brand voice is a Starter feature. Upgrade at /pricing.", upgrade: true }, { status: 403 });
+      }
     }
 
     const prompt = VOICE_PROFILE_ANALYSIS_PROMPT

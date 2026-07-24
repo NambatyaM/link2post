@@ -24,7 +24,7 @@ function getLimitForPlan(plan: Plan): number {
   }
 }
 
-async function getUserPlan(userId: string): Promise<Plan> {
+export async function getUserPlan(userId: string): Promise<Plan> {
   try {
     const supabase = getSupabaseServer();
     const { data: profile } = await supabase

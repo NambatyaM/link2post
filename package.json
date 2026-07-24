@@ -34,6 +34,7 @@
     "@trigger.dev/sdk": "^3.3.17",
     "docx": "^9.7.1",
     "exceljs": "^4.4.0",
+    "framer-motion": "^12.42.2",
     "html2canvas-pro": "^2.2.4",
     "jspdf": "^4.2.1",
     "jszip": "^3.10.1",

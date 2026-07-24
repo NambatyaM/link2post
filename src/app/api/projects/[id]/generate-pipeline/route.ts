@@ -14,7 +14,8 @@ import { getAvailableProviders, callAI } from "@/lib/pipeline/orchestrator";
 import { parseJsonResponse } from "@/lib/pipeline/parsers";
 import { savePosts, saveArticles } from "@/lib/pipeline/saver";
 import type { AnalysisResult, PostsResult, ArticlesCalendarResult } from "@/lib/pipeline/types";
-import { checkRateLimit, getRateLimitHeaders, recordGeneration } from "@/lib/rate-limit";
+import { checkRateLimit, getRateLimitHeaders, recordGeneration, getUserPlan } from "@/lib/rate-limit";
+import { checkMonthlyQuota } from "@/lib/features";
 
 const AI_MAX_TOKENS = 12_000;
 
@@ -48,6 +49,15 @@ export async function POST(
       return Response.json(
         { error: "Free limit reached. Upgrade for unlimited generation.", limit: rateResult.limit, retryAfterMs: rateResult.retryAfterMs },
         { status: 429, headers: getRateLimitHeaders(rateResult) },
+      );
+    }
+
+    const plan = await getUserPlan(userId);
+    const postQuota = await checkMonthlyQuota(userId, "posts", plan);
+    if (!postQuota.allowed) {
+      return Response.json(
+        { error: "Monthly post limit reached. Upgrade your plan for more posts.", limit: postQuota.limit, used: postQuota.used, upgrade: true },
+        { status: 403 },
       );
     }
 

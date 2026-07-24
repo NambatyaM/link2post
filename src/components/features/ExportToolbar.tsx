@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import type { Project, LinkedInPost } from "@/lib/types";
+import { usePlan } from "@/components/providers/PlanProvider";
 import {
   exportToTxt,
   exportToMarkdown,
@@ -16,19 +18,29 @@ interface ExportToolbarProps {
 
 type ExportFormat = "txt" | "md" | "csv" | "pdf" | "docx" | "xlsx" | "zip";
 
-const EXPORT_OPTIONS: { format: ExportFormat; label: string; ext: string; mime: string }[] = [
+const ALL_EXPORT_OPTIONS: { format: ExportFormat; label: string; ext: string; mime: string; minPlan?: string }[] = [
   { format: "txt", label: "TXT", ext: ".txt", mime: "text/plain" },
-  { format: "md", label: "Markdown", ext: ".md", mime: "text/markdown" },
-  { format: "csv", label: "CSV", ext: ".csv", mime: "text/csv" },
-  { format: "pdf", label: "PDF", ext: ".pdf", mime: "application/pdf" },
-  { format: "docx", label: "Word", ext: ".docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document" },
-  { format: "xlsx", label: "Excel", ext: ".xlsx", mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" },
-  { format: "zip", label: "ZIP (All)", ext: ".zip", mime: "application/zip" },
+  { format: "md", label: "Markdown", ext: ".md", mime: "text/markdown", minPlan: "starter" },
+  { format: "csv", label: "CSV", ext: ".csv", mime: "text/csv", minPlan: "starter" },
+  { format: "pdf", label: "PDF", ext: ".pdf", mime: "application/pdf", minPlan: "starter" },
+  { format: "docx", label: "Word", ext: ".docx", mime: "application/vnd.openxmlformats-officedocument.wordprocessingml.document", minPlan: "starter" },
+  { format: "xlsx", label: "Excel", ext: ".xlsx", mime: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", minPlan: "starter" },
+  { format: "zip", label: "ZIP (All)", ext: ".zip", mime: "application/zip", minPlan: "starter" },
 ];
 
 export default function ExportToolbar({ project, posts }: ExportToolbarProps) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const { plan } = usePlan();
+  const router = useRouter();
+  const isPaid = plan === "starter" || plan === "pro";
+
+  const EXPORT_OPTIONS = ALL_EXPORT_OPTIONS.filter((opt) => {
+    if (!opt.minPlan) return true;
+    return isPaid;
+  });
+
+  const lockedOptions = ALL_EXPORT_OPTIONS.filter((opt) => opt.minPlan && !isPaid);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -190,7 +202,7 @@ export default function ExportToolbar({ project, posts }: ExportToolbarProps) {
             top: "100%",
             right: 0,
             marginTop: "4px",
-            minWidth: "160px",
+            minWidth: "180px",
             background: "var(--bg-secondary)",
             border: "1px solid var(--border)",
             borderRadius: "8px",
@@ -229,6 +241,47 @@ export default function ExportToolbar({ project, posts }: ExportToolbarProps) {
               {opt.label}
             </button>
           ))}
+          {lockedOptions.length > 0 && (
+            <>
+              <div style={{ borderTop: "1px solid var(--border)", margin: "4px 0" }} />
+              {lockedOptions.map((opt) => (
+                <button
+                  key={opt.format}
+                  onClick={() => { setOpen(false); router.push("/pricing"); }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    width: "100%",
+                    textAlign: "left",
+                    padding: "8px 12px",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    color: "var(--text-muted)",
+                    background: "transparent",
+                    borderRadius: "6px",
+                    border: "none",
+                    cursor: "pointer",
+                    transition: "all 0.15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "var(--bg-hover)";
+                    e.currentTarget.style.color = "var(--text-primary)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "var(--text-muted)";
+                  }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                  {opt.label}
+                </button>
+              ))}
+            </>
+          )}
         </div>
       )}
     </div>

@@ -1,7 +1,7 @@
 export const PLANS = {
-  free: { id: "free", label: "Free", price: 0, postsPerMonth: 10, providers: 2 },
-  starter: { id: "starter", label: "Starter", price: 15, postsPerMonth: 50, providers: 4, paddlePriceId: "" },
-  pro: { id: "pro", label: "Pro", price: 49, postsPerMonth: Infinity, providers: 6, paddlePriceId: "" },
+  free: { id: "free", label: "Free", price: 0, projectsPerMonth: 1, postsPerMonth: 5, providers: 2 },
+  starter: { id: "starter", label: "Starter", price: 19, projectsPerMonth: 10, postsPerMonth: 50, providers: 4, paddlePriceId: "" },
+  pro: { id: "pro", label: "Pro", price: 49, projectsPerMonth: Infinity, postsPerMonth: Infinity, providers: 6, paddlePriceId: "" },
 } as const;
 
 export type PlanId = keyof typeof PLANS;
