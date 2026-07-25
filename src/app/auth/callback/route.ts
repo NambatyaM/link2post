@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   }
 
   if (code) {
-    let res = NextResponse.redirect(`${origin}${next}`);
+    const res = NextResponse.redirect(`${origin}${next}`);
 
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,

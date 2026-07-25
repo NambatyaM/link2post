@@ -104,11 +104,11 @@ export function exportToCsv(result: LinkedInResult): string {
     let body = "";
     let imagePrompt = "";
 
-    if (entry.type === "post" && result.posts[entry.contentIndex]) {
+    if (entry.type === "post" && entry.contentIndex >= 0 && entry.contentIndex < result.posts.length) {
       const post = result.posts[entry.contentIndex];
       body = post.hook + "\n\n" + post.body;
       imagePrompt = post.imagePrompt;
-    } else if (entry.type === "article" && result.articles[entry.contentIndex]) {
+    } else if (entry.type === "article" && entry.contentIndex >= 0 && entry.contentIndex < result.articles.length) {
       const article = result.articles[entry.contentIndex];
       body = article.title + "\n\n" + article.body;
       imagePrompt = article.imagePrompts.join(" | ");

@@ -135,48 +135,37 @@ export async function PATCH(
 
       const idsToKeep = new Set(existingIds.filter((id) => existingIdSet.has(id)));
 
-      for (const id of existingIdSet) {
-        if (!idsToKeep.has(id)) {
-          await supabase.from("posts").delete().eq("id", id);
-        }
+      const idsToDelete = [...existingIdSet].filter((id) => !idsToKeep.has(id));
+      if (idsToDelete.length > 0) {
+        await supabase.from("posts").delete().in("id", idsToDelete);
       }
 
-      for (const post of body.posts) {
+      const upserts = body.posts.map((post) => {
+        const payload = {
+          project_id: projectId,
+          user_id: user.userId,
+          content: post.hook + "\n\n" + post.body,
+          hook: post.hook,
+          post_type: post.postType || "story",
+          virality_score: post.viralityScore ?? 0,
+          authority_score: post.authorityScore ?? 0,
+          comment_potential: post.commentPotential ?? 0,
+          readability_score: post.readabilityScore ?? 0,
+          image_prompt: post.imagePrompt,
+          status: post.status || "draft",
+          scheduled_date: post.scheduledDate || null,
+          published_at: post.publishedAt || null,
+          voice_consistency_score: post.voiceConsistency || null,
+          updated_at: new Date().toISOString(),
+        };
         if (post.id && idsToKeep.has(post.id)) {
-          await supabase.from("posts").update({
-            content: post.hook + "\n\n" + post.body,
-            hook: post.hook,
-            post_type: post.postType || "story",
-            virality_score: post.viralityScore ?? 0,
-            authority_score: post.authorityScore ?? 0,
-            comment_potential: post.commentPotential ?? 0,
-            readability_score: post.readabilityScore ?? 0,
-            image_prompt: post.imagePrompt,
-            status: post.status || "draft",
-            scheduled_date: post.scheduledDate || null,
-            published_at: post.publishedAt || null,
-            voice_consistency_score: post.voiceConsistency || null,
-            updated_at: new Date().toISOString(),
-          }).eq("id", post.id);
-        } else {
-          await supabase.from("posts").insert({
-            project_id: projectId,
-            user_id: user.userId,
-            content: post.hook + "\n\n" + post.body,
-            hook: post.hook,
-            post_type: post.postType || "story",
-            virality_score: post.viralityScore ?? 0,
-            authority_score: post.authorityScore ?? 0,
-            comment_potential: post.commentPotential ?? 0,
-            readability_score: post.readabilityScore ?? 0,
-            image_prompt: post.imagePrompt,
-            status: post.status || "draft",
-            scheduled_date: post.scheduledDate || null,
-            published_at: post.publishedAt || null,
-            voice_consistency_score: post.voiceConsistency || null,
-          });
+          return supabase.from("posts").update(payload).eq("id", post.id);
         }
-      }
+        delete (payload as Record<string, unknown>).updated_at;
+        return supabase.from("posts").insert(payload);
+      });
+
+      await Promise.all(upserts);
     }
 
     return Response.json({ success: true });

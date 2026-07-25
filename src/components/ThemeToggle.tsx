@@ -1,24 +1,23 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 
 export default function ThemeToggle() {
   const [isLight, setIsLight] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const hasLight = document.documentElement.classList.contains("light");
-    setIsLight(hasLight);
+    setIsLight(document.documentElement.classList.contains("light"));
     setMounted(true);
   }, []);
 
-  const toggle = () => {
+  const toggle = useCallback(() => {
     const newIsLight = document.documentElement.classList.toggle("light");
     setIsLight(newIsLight);
     try {
       localStorage.setItem("link2post_theme", newIsLight ? "light" : "dark");
     } catch {}
-  };
+  }, []);
 
   if (!mounted) return null;
 

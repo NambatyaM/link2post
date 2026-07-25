@@ -4,22 +4,26 @@
 import { POST } from "../route";
 import { NextRequest } from "next/server";
 
-jest.mock("@/lib/supabase-server", () => ({
-  getSupabaseServer: jest.fn(() => ({
-    auth: {
-      getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
-    },
-    from: jest.fn(() => ({
-      select: jest.fn().mockReturnThis(),
-      insert: jest.fn().mockResolvedValue({ error: null }),
-      eq: jest.fn().mockReturnThis(),
-      gte: jest.fn().mockReturnThis(),
-      order: jest.fn().mockReturnThis(),
-      limit: jest.fn().mockReturnThis(),
-      single: jest.fn().mockResolvedValue({ data: null, error: null }),
-      head: jest.fn().mockReturnThis(),
-    })),
+const mockSupabase = {
+  auth: {
+    getUser: jest.fn().mockResolvedValue({ data: { user: null }, error: null }),
+  },
+  from: jest.fn(() => ({
+    select: jest.fn().mockReturnThis(),
+    insert: jest.fn().mockResolvedValue({ error: null }),
+    eq: jest.fn().mockReturnThis(),
+    gte: jest.fn().mockReturnThis(),
+    order: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    single: jest.fn().mockResolvedValue({ data: null, error: null }),
+    head: jest.fn().mockReturnThis(),
   })),
+};
+
+jest.mock("@/lib/supabase-server", () => ({
+  getSupabaseServer: jest.fn(() => mockSupabase),
+  getSupabaseAdmin: jest.fn(() => mockSupabase),
+  getSupabaseFromCookies: jest.fn(() => mockSupabase),
 }));
 
 function makeRequest(body: object, headers?: Record<string, string>): NextRequest {

@@ -1,6 +1,6 @@
 import type { Plan } from "./rate-limit";
 import { PLANS } from "./paddle";
-import { getSupabaseServer } from "./supabase-server";
+import { getSupabaseAdmin } from "./supabase-server";
 
 export type Feature =
   | "brand_voice"
@@ -50,24 +50,28 @@ export async function getMonthlyUsage(
   userId: string,
   resource: QuotaResource,
 ): Promise<number> {
-  const supabase = getSupabaseServer();
-  const monthStart = getMonthStart();
+  try {
+    const supabase = getSupabaseAdmin();
+    const monthStart = getMonthStart();
 
-  if (resource === "projects") {
+    if (resource === "projects") {
+      const { count } = await supabase
+        .from("projects")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", userId)
+        .gte("created_at", monthStart);
+      return count ?? 0;
+    }
+
     const { count } = await supabase
-      .from("projects")
+      .from("posts")
       .select("id", { count: "exact", head: true })
       .eq("user_id", userId)
       .gte("created_at", monthStart);
     return count ?? 0;
+  } catch {
+    return Infinity;
   }
-
-  const { count } = await supabase
-    .from("posts")
-    .select("id", { count: "exact", head: true })
-    .eq("user_id", userId)
-    .gte("created_at", monthStart);
-  return count ?? 0;
 }
 
 export interface QuotaCheckResult {
@@ -84,7 +88,8 @@ export async function checkMonthlyQuota(
 ): Promise<QuotaCheckResult> {
   const limit = getMonthlyLimit(plan, resource);
   if (limit === Infinity) {
-    return { allowed: true, used: 0, limit: Infinity, remaining: Infinity };
+    const used = await getMonthlyUsage(userId, resource);
+    return { allowed: true, used, limit: Infinity, remaining: Infinity };
   }
   const used = await getMonthlyUsage(userId, resource);
   const remaining = Math.max(0, limit - used);

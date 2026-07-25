@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { SYSTEM_PROMPT, PROMPTS, buildContentPrompt } from "@/lib/prompts";
-import { checkRateLimit, getRateLimitHeaders, recordGeneration } from "@/lib/rate-limit";
+import { checkRateLimit, getRateLimitHeaders, recordGeneration, generateServerDeviceId } from "@/lib/rate-limit";
 import { verifyToken, extractBearerToken } from "@/lib/auth";
 import { validateLinkedInResult, type ValidationError } from "@/lib/validate";
 import { recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
@@ -209,10 +209,17 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (videoInfo.transcript.length > 200000) {
+      return Response.json(
+        { error: "Transcript is too long. Maximum 200,000 characters." },
+        { status: 400 },
+      );
+    }
+
     let userId: string | undefined;
 
     const token = extractBearerToken(req);
-    const deviceId = req.headers.get("x-device-id") || undefined;
+    const deviceId = userId ? undefined : generateServerDeviceId(req);
 
     if (token) {
       const user = await verifyToken(token);

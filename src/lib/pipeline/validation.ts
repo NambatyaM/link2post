@@ -5,7 +5,7 @@ export const GeneratePipelineParamsSchema = z.object({
 });
 
 export const GeneratePipelineBodySchema = z.object({
-  audience: z.string().optional(),
+  audience: z.string().max(500, "Audience must be 500 characters or less").optional(),
   voiceProfilePrompt: z.string().optional(),
   variation: z.string().optional(),
 });

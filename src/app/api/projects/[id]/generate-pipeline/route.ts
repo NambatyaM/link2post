@@ -1,7 +1,7 @@
 import { NextRequest } from "next/server";
 import { extractBearerToken, verifyToken } from "@/lib/auth";
 import { unauthorized } from "@/lib/with-auth";
-import { getSupabaseServer } from "@/lib/supabase-server";
+import { getSupabaseServer, getSupabaseAdmin } from "@/lib/supabase-server";
 import {
   SYSTEM_PROMPT,
   buildAnalysisPrompt,
@@ -181,7 +181,7 @@ export async function POST(
           const msg = error instanceof Error ? error.message : "Generation failed";
           send({ stage: "error", message: msg });
           try {
-            const supabase = getSupabaseServer(req);
+            const supabase = getSupabaseAdmin();
             await supabase.from("projects").update({ status: "failed" }).eq("id", projectId).eq("user_id", userId);
           } catch { /* */ }
         } finally {
@@ -200,7 +200,7 @@ export async function POST(
   } catch (error) {
     console.error("[pipeline] Fatal:", error);
     try {
-      const supabase = getSupabaseServer(req);
+      const supabase = getSupabaseAdmin();
       await supabase.from("projects").update({ status: "failed" }).eq("id", projectId).eq("user_id", userId);
     } catch { /* */ }
     return Response.json({ error: error instanceof Error ? error.message : "Generation failed" }, { status: 500 });

@@ -3,6 +3,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
+  poweredByHeader: false,
 };
 
 export default withSentryConfig(nextConfig, {

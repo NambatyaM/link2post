@@ -78,6 +78,7 @@ export async function PATCH(req: NextRequest) {
       if (error.code === "42P01") {
         return Response.json({ success: true, warning: "Profile table not found" });
       }
+      return Response.json({ error: "Failed to update profile" }, { status: 500 });
     }
 
     return Response.json({ success: true });

@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { CAROUSEL_SYSTEM_PROMPT, buildCarouselPrompt } from "@/lib/prompts";
-import { checkRateLimit, getRateLimitHeaders, recordGeneration, getUserPlan } from "@/lib/rate-limit";
+import { checkRateLimit, getRateLimitHeaders, recordGeneration, getUserPlan, generateServerDeviceId } from "@/lib/rate-limit";
 import { verifyToken, extractBearerToken } from "@/lib/auth";
 import { buildAttempts, fetchWithTimeout, recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
 import { generateLocalCarousel } from "@/lib/local-generator";
@@ -56,7 +56,7 @@ export async function POST(req: NextRequest) {
     let userId: string | undefined;
 
     const token = extractBearerToken(req);
-    const deviceId = req.headers.get("x-device-id") || undefined;
+    const deviceId = userId ? undefined : generateServerDeviceId(req);
 
     if (token) {
       const user = await verifyToken(token);

@@ -13,6 +13,9 @@ export function getAvailableProviders(): Array<{ id: string; model: string }> {
     { id: "cerebras", model: "gpt-oss-120b", envKey: "CEREBRAS_API_KEY" },
     { id: "mistral", model: "mistral-small-latest", envKey: "MISTRAL_API_KEY" },
     { id: "tokengo", model: "deepseek-v4-flash", envKey: "THORBASE_API_KEY" },
+    { id: "freetheai", model: "bbl/gemini-3.5-flash", envKey: "FREETHEAI_KEY" },
+    { id: "sambanova", model: "Meta-Llama-3.3-70B-Instruct", envKey: "SAMBANOVA_API_KEY" },
+    { id: "nvidia", model: "nvidia/llama-3.3-nemotron-super-49b-v1", envKey: "NVIDIA_API_KEY" },
   ];
   for (const p of tryProviders) {
     if (process.env[p.envKey]) providers.push({ id: p.id, model: p.model });
@@ -26,6 +29,7 @@ async function tryProvider(
   provider: { id: string; model: string },
   messages: Array<{ role: string; content: string }>,
   maxTokens: number,
+  signal?: AbortSignal,
 ): Promise<CallAIResult> {
   const baseUrl = getProviderBaseUrl(provider.id);
   const apiKey = getProviderApiKey(provider.id);
@@ -34,6 +38,10 @@ async function tryProvider(
   const start = Date.now();
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), CALL_TIMEOUT_MS);
+
+  if (signal) {
+    signal.addEventListener("abort", () => controller.abort(), { once: true });
+  }
 
   const body: Record<string, unknown> = {
     model: provider.model,
@@ -78,10 +86,12 @@ export async function callAI(
 
   console.log(`[pipeline:${taskLabel}] Trying ${providers.length} providers in parallel: ${providers.map(p => p.id).join(", ")}`);
 
+  const controller = new AbortController();
+
   const raceMap = new Map(
     providers.map((p) => [
       p.id,
-      tryProvider(p, messages, maxTokens)
+      tryProvider(p, messages, maxTokens, controller.signal)
         .then((r) => ({ ok: true as const, result: r, provider: p }))
         .catch((err) => {
           const msg = err instanceof Error ? err.message : String(err);
@@ -95,6 +105,7 @@ export async function callAI(
     raceMap.delete(winner.provider.id);
 
     if (winner.ok) {
+      controller.abort();
       console.log(`[pipeline:${taskLabel}] Success: ${winner.provider.id}/${winner.result.model} in ${winner.result.latencyMs}ms`);
       return winner.result;
     }

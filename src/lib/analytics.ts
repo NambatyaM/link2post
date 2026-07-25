@@ -1,4 +1,4 @@
-import { getSupabaseServer } from "./supabase-server";
+import { getSupabaseAdmin } from "./supabase-server";
 
 export interface AnalyticsSummary {
   signups: { total: number; today: number; thisWeek: number; bySource: Record<string, number> };
@@ -12,7 +12,7 @@ export async function recordSignup(opts: {
   referrerCode?: string;
   deviceId?: string;
 }): Promise<void> {
-  const supabase = getSupabaseServer();
+  const supabase = getSupabaseAdmin();
   await supabase.from("signup_events").insert({
     user_id: opts.userId,
     source: opts.source || "direct",
@@ -28,7 +28,7 @@ export async function recordVisit(opts: {
   path?: string;
   sessionId?: string;
 }): Promise<{ isReturn: boolean }> {
-  const supabase = getSupabaseServer();
+  const supabase = getSupabaseAdmin();
   const { userId, deviceId, fingerprint, path = "/", sessionId } = opts;
 
   let isReturn = false;
@@ -69,7 +69,7 @@ export async function recordGenerationEvent(opts: {
   errorMessage?: string;
   durationMs?: number;
 }): Promise<void> {
-  const supabase = getSupabaseServer();
+  const supabase = getSupabaseAdmin();
   await supabase.from("generation_analytics").insert({
     user_id: opts.userId || null,
     device_id: opts.deviceId || null,
@@ -83,7 +83,7 @@ export async function recordGenerationEvent(opts: {
 }
 
 export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
-  const supabase = getSupabaseServer();
+  const supabase = getSupabaseAdmin();
   const now = new Date();
   const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())).toISOString();
   const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();

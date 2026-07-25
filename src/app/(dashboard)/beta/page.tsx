@@ -10,7 +10,6 @@ export default function BetaPage() {
   const [loading, setLoading] = useState(true);
   const [unlocking, setUnlocking] = useState(false);
   const [email, setEmail] = useState("");
-  const [showFeedback, setShowFeedback] = useState(false);
   const [feedbackRating, setFeedbackRating] = useState(0);
   const [feedbackText, setFeedbackText] = useState("");
   const [feedbackSent, setFeedbackSent] = useState(false);
@@ -109,7 +108,7 @@ export default function BetaPage() {
             Beta Program
           </span>
           <h1 className="text-2xl font-bold mb-2" style={{ color: "var(--text-primary)" }}>
-            {hasAccess ? "You've Got Full Access" : "Unlock Everything — Free During Beta"}
+            {hasAccess ? "You&apos;ve Got Full Access" : "Unlock Everything — Free During Beta"}
           </h1>
           <p className="text-sm leading-relaxed" style={{ color: "var(--text-muted)" }}>
             {hasAccess
@@ -167,8 +166,8 @@ export default function BetaPage() {
                 {unlocking ? "Unlocking..." : "Get Full Access"}
               </button>
             </div>
-            <p className="text-[10px] mt-2" style={{ color: "var(--text-muted)" }}>
-              We'll email you when paid plans launch. No spam, ever.
+              <p className="text-[10px] mt-2" style={{ color: "var(--text-muted)" }}>
+              We&apos;ll email you when paid plans launch. No spam, ever.
             </p>
           </div>
         ) : (
@@ -185,7 +184,7 @@ export default function BetaPage() {
                 </div>
                 <div>
                   <p className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>All features unlocked</p>
-                  <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>You're on the priority waitlist</p>
+                  <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>You&apos;re on the priority waitlist</p>
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
@@ -203,7 +202,7 @@ export default function BetaPage() {
                 style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
               >
                 <h2 className="text-sm font-semibold mb-1" style={{ color: "var(--text-primary)" }}>
-                  How's your experience so far?
+                  How&apos;s your experience so far?
                 </h2>
                 <p className="text-[11px] mb-4" style={{ color: "var(--text-muted)" }}>
                   Your feedback directly shapes what we build next.

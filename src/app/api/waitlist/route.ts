@@ -1,5 +1,5 @@
 import { NextRequest } from "next/server";
-import { getSupabaseServer } from "@/lib/supabase-server";
+import { getSupabaseAdmin } from "@/lib/supabase-server";
 
 export async function POST(req: NextRequest) {
   try {
@@ -10,7 +10,7 @@ export async function POST(req: NextRequest) {
     }
 
     const normalized = email.trim().toLowerCase();
-    const supabase = getSupabaseServer();
+    const supabase = getSupabaseAdmin();
 
     // Try to get user ID if authenticated
     let userId: string | null = null;

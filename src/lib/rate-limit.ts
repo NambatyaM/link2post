@@ -1,9 +1,18 @@
-import { getSupabaseServer } from "./supabase-server";
+import { getSupabaseAdmin } from "./supabase-server";
 import { TRIAL_LIMIT } from "./constants";
+import { createHash } from "crypto";
 
 const FREE_LIMIT = 10;
 const STARTER_LIMIT = 50;
 const WINDOW_MS = 3_600_000; // 1 hour
+
+export function generateServerDeviceId(req: Request): string {
+  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim()
+    || req.headers.get("x-real-ip")
+    || "unknown";
+  const ua = req.headers.get("user-agent") || "unknown";
+  return createHash("sha256").update(`${ip}:${ua}`).digest("hex").slice(0, 32);
+}
 
 export type Plan = "anonymous" | "free" | "starter" | "pro";
 
@@ -26,7 +35,7 @@ function getLimitForPlan(plan: Plan): number {
 
 export async function getUserPlan(userId: string): Promise<Plan> {
   try {
-    const supabase = getSupabaseServer();
+    const supabase = getSupabaseAdmin();
     const { data: profile } = await supabase
       .from("user_profiles")
       .select("plan, beta_access")
@@ -48,7 +57,7 @@ export async function checkRateLimit(opts: {
   plan?: Plan;
 }): Promise<RateLimitResult> {
   const { userId, deviceId } = opts;
-  const supabase = getSupabaseServer();
+  const supabase = getSupabaseAdmin();
 
   const plan = opts.plan || (userId ? await getUserPlan(userId) : "anonymous");
 
@@ -116,11 +125,7 @@ export async function checkRateLimit(opts: {
     return { allowed: true, remaining: limit - used - 1, retryAfterMs: 0, limit, plan };
   }
 
-  if (!userId && !deviceId) {
-    return { allowed: false, remaining: 0, retryAfterMs: WINDOW_MS, limit: 0, plan };
-  }
-
-  return { allowed: true, remaining: limit, retryAfterMs: 0, limit, plan };
+  return { allowed: false, remaining: 0, retryAfterMs: WINDOW_MS, limit: 0, plan };
 }
 
 export async function recordGeneration(opts: {
@@ -128,7 +133,7 @@ export async function recordGeneration(opts: {
   deviceId?: string;
   fingerprint?: string;
 }): Promise<void> {
-  const supabase = getSupabaseServer();
+  const supabase = getSupabaseAdmin();
   await supabase.from("generations").insert({
     user_id: opts.userId || null,
     device_id: opts.deviceId || null,
@@ -137,7 +142,7 @@ export async function recordGeneration(opts: {
 }
 
 export async function linkDeviceToUser(deviceId: string, userId: string): Promise<void> {
-  const supabase = getSupabaseServer();
+  const supabase = getSupabaseAdmin();
   await supabase
     .from("generations")
     .update({ user_id: userId })

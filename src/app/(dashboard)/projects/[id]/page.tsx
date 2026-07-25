@@ -2,6 +2,7 @@
 
 import { use, useState, useCallback, useRef, Suspense } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
 import type { Project, LinkedInPost } from "@/lib/types";
 import PostEditor from "@/components/features/PostEditor";
@@ -559,7 +560,7 @@ export default function ProjectDetailPage() {
       <main className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg-primary)" }}>
         <div className="text-center">
           <p className="text-sm mb-4" style={{ color: "var(--error)" }}>Invalid project ID</p>
-          <a href="/projects" className="text-xs font-medium px-4 py-2 rounded-lg inline-block" style={{ background: "var(--accent)", color: "white" }}>Back to Projects</a>
+          <Link href="/projects" className="text-xs font-medium px-4 py-2 rounded-lg inline-block" style={{ background: "var(--accent)", color: "white" }}>Back to Projects</Link>
         </div>
       </main>
     );

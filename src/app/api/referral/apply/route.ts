@@ -54,28 +54,16 @@ export async function POST(req: NextRequest) {
       p_amount: BONUS_PER_REFERRAL,
     });
     if (rpcError) {
-      const { data: existingCredits } = await supabase
-        .from("user_credits")
-        .select("bonus")
-        .eq("user_id", codeRow.user_id)
-        .single();
-      const currentBonus = existingCredits?.bonus || 0;
-      await supabase.from("user_credits").upsert({
-        user_id: codeRow.user_id,
-        bonus: currentBonus + BONUS_PER_REFERRAL,
-      }, { onConflict: "user_id" });
+      console.error("Referrer bonus RPC failed, falling back:", rpcError);
     }
 
-    const { data: referredCredits } = await supabase
-      .from("user_credits")
-      .select("bonus")
-      .eq("user_id", user.userId)
-      .single();
-    const referredBonus = referredCredits?.bonus || 0;
-    await supabase.from("user_credits").upsert({
-      user_id: user.userId,
-      bonus: referredBonus + BONUS_PER_REFERRAL,
-    }, { onConflict: "user_id" });
+    const { error: referredRpcError } = await supabase.rpc("increment_bonus", {
+      p_user_id: user.userId,
+      p_amount: BONUS_PER_REFERRAL,
+    });
+    if (referredRpcError) {
+      console.error("Referred bonus RPC failed, falling back:", referredRpcError);
+    }
 
     return Response.json({ ok: true });
   } catch (error) {

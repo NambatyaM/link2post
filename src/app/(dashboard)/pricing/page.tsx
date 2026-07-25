@@ -98,10 +98,10 @@ function WaitlistForm({ planId, onSuccess }: { planId: string; onSuccess: () => 
     return (
       <div className="text-center py-3">
         <p className="text-sm font-semibold" style={{ color: "var(--success)" }}>
-          You're on the list!
+          You&apos;re on the list!
         </p>
         <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-          We'll notify you the moment it launches.
+          We&apos;ll notify you the moment it launches.
         </p>
       </div>
     );
@@ -146,7 +146,7 @@ export default function PricingPage() {
             Simple, transparent pricing
           </h1>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Start free. Upgrade when you're ready for more.
+            Start free. Upgrade when you&apos;re ready for more.
           </p>
         </div>
 
@@ -200,10 +200,10 @@ export default function PricingPage() {
                 subscribed[plan.id] ? (
                   <div className="text-center py-3">
                     <p className="text-sm font-semibold" style={{ color: "var(--success)" }}>
-                      You're on the list!
+                      You&apos;re on the list!
                     </p>
                     <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
-                      We'll email you the moment this plan launches.
+                      We&apos;ll email you the moment this plan launches.
                     </p>
                   </div>
                 ) : (

@@ -56,7 +56,7 @@ export default function NewProjectPage() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.access_token) throw new Error("Not authenticated");
 
-      let inputText = transcript.trim();
+      const inputText = transcript.trim();
 
       const res = await fetch("/api/projects", {
         method: "POST",

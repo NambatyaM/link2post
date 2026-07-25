@@ -1,12 +1,14 @@
-import { getSupabaseServer } from "./supabase-server";
+import { getSupabaseAdmin } from "./supabase-server";
 
 export function stubEmbedding(text: string): number[] {
   const embedding = new Array(1536).fill(0);
+  let hash = 0x811c9dc5;
   for (let i = 0; i < text.length; i++) {
-    const charCode = text.charCodeAt(i);
-    embedding[i % 1536] += charCode;
-    embedding[(i * 7 + 3) % 1536] += charCode * 0.618;
-    embedding[(i * 13 + 7) % 1536] += Math.sin(charCode * 0.01) * 0.5;
+    hash ^= text.charCodeAt(i);
+    hash = (hash * 0x01000193) >>> 0;
+    embedding[i % 1536] += (hash & 0xff) / 255 - 0.5;
+    embedding[(i * 7 + 3) % 1536] += ((hash >>> 8) & 0xff) / 255 - 0.5;
+    embedding[(i * 13 + 7) % 1536] += ((hash >>> 16) & 0xff) / 255 - 0.5;
   }
   let norm = 0;
   for (let i = 0; i < 1536; i++) {
@@ -28,7 +30,7 @@ export async function storeMemory(
   embedding: number[],
   metadata: Record<string, unknown> = {},
 ) {
-  const supabase = getSupabaseServer();
+  const supabase = getSupabaseAdmin();
   const { data, error } = await supabase
     .from("brand_voice_memories")
     .insert({
@@ -51,7 +53,7 @@ export async function matchMemories(
   matchCount: number = 5,
   contentTypeFilter?: string,
 ) {
-  const supabase = getSupabaseServer();
+  const supabase = getSupabaseAdmin();
   const { data, error } = await supabase.rpc("match_brand_voice", {
     query_embedding: `[${queryEmbedding.join(",")}]`,
     p_user_id: userId,

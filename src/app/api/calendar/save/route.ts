@@ -82,10 +82,11 @@ export async function POST(req: NextRequest) {
     }
 
     const now = new Date();
-    const weekYear = now.getFullYear();
-    const oneJan = new Date(weekYear, 0, 1);
-    const weekNumber = Math.ceil(((now.getTime() - oneJan.getTime()) / 86400000 + oneJan.getDay() + 1) / 7);
-    const calendarWeek = `${weekYear}-W${String(weekNumber).padStart(2, "0")}`;
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const diff = now.getTime() - startOfYear.getTime();
+    const oneWeek = 604800000;
+    const weekNumber = Math.ceil((diff / oneWeek + startOfYear.getDay() + 1) / 7);
+    const calendarWeek = `${now.getFullYear()}-W${String(weekNumber).padStart(2, "0")}`;
 
     await supabase.from("generation_events").insert({
       user_id: user.userId,

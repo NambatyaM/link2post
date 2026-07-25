@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { getSupabaseBrowser } from "@/lib/supabase-browser";
+import Link from "next/link";
 
 const PieChartLazy = lazy(() =>
   import("recharts").then((m) => ({
@@ -178,7 +179,7 @@ export default function AnalyticsPage() {
           </svg>
           <p className="text-sm mb-2" style={{ color: "var(--text-muted)" }}>No analytics yet.</p>
           <p className="text-xs mb-4" style={{ color: "var(--text-muted)" }}>Generate your first content project to unlock AI insights.</p>
-          <a href="/projects/new" className="text-xs font-medium px-4 py-2 rounded-lg inline-block" style={{ background: "var(--accent)", color: "white" }}>Generate My First Project</a>
+          <Link href="/projects/new" className="text-xs font-medium px-4 py-2 rounded-lg inline-block" style={{ background: "var(--accent)", color: "white" }}>Generate My First Project</Link>
         </div>
       ) : (
         <div className="flex flex-col gap-6">

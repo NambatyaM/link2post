@@ -1,6 +1,6 @@
 import { NextRequest } from "next/server";
 import { getProviderBaseUrl, getProviderApiKey, getProviderHeaders } from "@/services/ai/providers/shared";
-import { checkHealth as checkOllamaHealth, listModels as listOllamaModels } from "@/services/ai/providers/ollama";
+import { extractBearerToken, verifyToken } from "@/lib/auth";
 
 const HEALTH_TIMEOUT_MS = 10_000;
 const HEALTH_PROMPT = "Say exactly one word: ok";
@@ -23,7 +23,16 @@ const MODELS_TO_TEST = [
   { provider: "mistral", model: "mistral-small-latest" },
 ];
 
-export async function GET(_req: NextRequest) {
+const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+
+export async function GET(req: NextRequest) {
+  const token = extractBearerToken(req);
+  if (!token) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  const user = await verifyToken(token);
+  if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (ADMIN_EMAILS.length === 0 || !ADMIN_EMAILS.includes(user.email?.toLowerCase() || "")) {
+    return Response.json({ error: "Forbidden" }, { status: 403 });
+  }
   const results: ModelHealth[] = [];
 
   // Test external providers
@@ -88,6 +97,7 @@ export async function GET(_req: NextRequest) {
 
   // Test Ollama
   try {
+    const { checkHealth: checkOllamaHealth } = await import("@/services/ai/providers/ollama");
     const ollamaHealth = await checkOllamaHealth();
     const ollamaModels = ollamaHealth.models;
     

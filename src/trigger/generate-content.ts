@@ -1,5 +1,5 @@
 import { task, metadata } from "@trigger.dev/sdk/v3";
-import { getSupabaseServer } from "@/lib/supabase-server";
+import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { buildContentPrompt, SYSTEM_PROMPT } from "@/lib/prompts";
 import { buildAttempts, fetchWithTimeout, recordProviderFailure, clearProviderCooldown } from "@/lib/providers";
 import { validateLinkedInResult } from "@/lib/validate";
@@ -23,7 +23,7 @@ export const generateContentTask = task({
   maxDuration: 120,
   run: async (payload: GenerateContentPayload, { ctx: _ctx }) => {
     const { projectId, userId, niche: _niche, audience, voiceProfilePrompt } = payload;
-    const supabase = getSupabaseServer();
+    const supabase = getSupabaseAdmin();
 
     // Step 1: Fetch project from Supabase
     await updateProgress("fetch_project", 5, "Fetching project data");
@@ -189,7 +189,7 @@ export const generateContentTask = task({
   onFailure: async (payload: GenerateContentPayload, error: unknown, { ctx: _ctx }) => {
     const { projectId, userId } = payload;
     try {
-      const supabase = getSupabaseServer();
+      const supabase = getSupabaseAdmin();
       await supabase
         .from("projects")
         .update({ status: "failed" })

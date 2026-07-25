@@ -1,4 +1,4 @@
-import { getSupabaseServer } from "./supabase-server";
+import { getSupabaseAdmin } from "./supabase-server";
 
 export interface AuthUser {
   userId: string;
@@ -14,7 +14,7 @@ export function extractBearerToken(request: Request): string | null {
 
 export async function verifyToken(token: string): Promise<AuthUser | null> {
   try {
-    const supabase = getSupabaseServer();
+    const supabase = getSupabaseAdmin();
     const { data, error } = await supabase.auth.getUser(token);
     if (error || !data.user) return null;
     return { userId: data.user.id, email: data.user.email };

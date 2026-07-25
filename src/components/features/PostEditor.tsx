@@ -82,12 +82,12 @@ function LinkedInPreview({ hook, body }: { hook: string; body: string }) {
 }
 
 export default function PostEditor({ post, index, onUpdate, onSave, onApprove, onDiscard }: PostEditorProps) {
-  if (!post) return null;
-
   const [previewMode, setPreviewMode] = useState<PreviewMode>("edit");
-  const [hook, setHook] = useState(post.hook ?? "");
-  const [body, setBody] = useState(post.body ?? "");
+  const [hook, setHook] = useState(post?.hook ?? "");
+  const [body, setBody] = useState(post?.body ?? "");
   const [copied, setCopied] = useState(false);
+
+  if (!post) return null;
 
   const bodyPlainText = stripHtml(body);
   const totalChars = hook.length + bodyPlainText.length + (hook && bodyPlainText ? 2 : 0);

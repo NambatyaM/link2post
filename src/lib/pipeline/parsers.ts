@@ -16,10 +16,13 @@ export function parseJsonResponse<T>(raw: string): T | null {
     try { return JSON.parse(cleaned.slice(jsonStart, jsonEnd + 1)) as T; } catch { /* continue */ }
   }
 
-  // Try to find JSON in a larger chunk (sometimes the model adds trailing text)
+  // Try to find JSON starting from a later brace position
   const secondBrace = cleaned.indexOf("{", jsonStart + 1);
-  if (secondBrace !== -1 && secondBrace < jsonEnd) {
-    try { return JSON.parse(cleaned.slice(secondBrace, jsonEnd + 1)) as T; } catch { /* continue */ }
+  if (secondBrace !== -1) {
+    const secondEnd = cleaned.lastIndexOf("}", secondBrace + 1);
+    if (secondEnd > secondBrace) {
+      try { return JSON.parse(cleaned.slice(secondBrace, secondEnd + 1)) as T; } catch { /* continue */ }
+    }
   }
 
   return null;

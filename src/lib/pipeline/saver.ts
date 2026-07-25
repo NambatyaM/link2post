@@ -58,5 +58,6 @@ export async function saveArticles(
   const { error } = await supabase.from("posts").insert(rows);
   if (error) {
     console.error("[saver] Failed to save articles:", error);
+    throw new Error(`Failed to save articles: ${error.message}`);
   }
 }

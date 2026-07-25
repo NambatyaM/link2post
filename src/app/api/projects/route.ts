@@ -129,6 +129,14 @@ export async function POST(req: NextRequest) {
       return Response.json({ error: "title and transcript are required" }, { status: 400 });
     }
 
+    if (title.length > 500) {
+      return Response.json({ error: "Title must be 500 characters or less" }, { status: 400 });
+    }
+
+    if (transcript.length > 500000) {
+      return Response.json({ error: "Transcript must be 500,000 characters or less" }, { status: 400 });
+    }
+
     const plan = await getUserPlan(user.userId);
     const quota = await checkMonthlyQuota(user.userId, "projects", plan);
     if (!quota.allowed) {

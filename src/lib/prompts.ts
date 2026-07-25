@@ -882,7 +882,7 @@ export function buildVideoScriptPrompt(videoInfo: VideoInfo): string {
 ${videoInfo.title}
 
 ---VIDEO DESCRIPTION---
-${videoInfo.description.slice(0, 500)}
+${(videoInfo.description ?? "").slice(0, 500)}
 
 ---VIDEO TRANSCRIPT---
 ${videoInfo.transcript.slice(0, 15000)}
