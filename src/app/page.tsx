@@ -394,16 +394,58 @@ export default function LandingPage() {
       </section>
 
       {/* Problem-Agitate Section */}
-      <section className="px-6 py-24">
-        <div className="max-w-3xl mx-auto text-center">
+      <section className="px-6 py-24 relative overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none" aria-hidden>
+          <div className="absolute w-[400px] h-[400px] rounded-full blur-[120px] opacity-8"
+            style={{ background: "#EF4444", top: "10%", right: "-5%" }} />
+        </div>
+
+        <div className="max-w-5xl mx-auto relative z-10">
           <RevealBlock>
-            <h2 className="text-2xl sm:text-3xl font-bold mb-6 leading-snug">You already have great content. You just don&apos;t have time to turn it into LinkedIn posts.</h2>
-            <p className="text-sm leading-relaxed mb-4" style={{ color: "var(--text-secondary)" }}>
-              Every week, you spend 4+ hours writing posts, researching hooks, designing carousels, and scheduling at the right times. And you still wonder if your content will perform.
-            </p>
-            <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              Meanwhile, the creators who grow fastest aren&apos;t writing more &mdash; they&apos;re repurposing smarter.
-            </p>
+            <div className="text-center mb-14">
+              <h2 className="text-2xl sm:text-3xl font-bold mb-4 leading-snug">
+                Your content is already great.<br />
+                <span style={{ color: "var(--text-muted)" }}>The bottleneck is turning it into LinkedIn posts.</span>
+              </h2>
+            </div>
+          </RevealBlock>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-14">
+            {[
+              { icon: "\u23F1\uFE0F", label: "4+ hours per week", desc: "Writing, editing, formatting" },
+              { icon: "\uD83D\uDCA1", label: "Constantly guessing", desc: "What hooks will perform" },
+              { icon: "\uD83C\uDFA8", label: "Switching between tools", desc: "Docs, Canva, scheduling apps" },
+              { icon: "\uD83D\uDCC9", label: "No clear feedback", desc: "Publishing and hoping for the best" },
+            ].map((pain, i) => (
+              <RevealBlock key={pain.label} delay={i * 0.08}>
+                <motion.div
+                  className="rounded-xl p-5 text-center"
+                  style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
+                  whileHover={{ y: -3, borderColor: "rgba(248,113,113,0.2)" }}
+                >
+                  <div className="text-2xl mb-3">{pain.icon}</div>
+                  <p className="text-sm font-semibold mb-1" style={{ color: "var(--text-primary)" }}>{pain.label}</p>
+                  <p className="text-[11px]" style={{ color: "var(--text-muted)" }}>{pain.desc}</p>
+                </motion.div>
+              </RevealBlock>
+            ))}
+          </div>
+
+          <RevealBlock>
+            <div className="flex items-center gap-4 max-w-2xl mx-auto">
+              <div className="flex-1 h-px" style={{ background: "linear-gradient(90deg, transparent, var(--border))" }} />
+              <span className="text-xs font-semibold uppercase tracking-wider shrink-0" style={{ color: "var(--accent)" }}>The shift</span>
+              <div className="flex-1 h-px" style={{ background: "linear-gradient(90deg, var(--border), transparent)" }} />
+            </div>
+          </RevealBlock>
+
+          <RevealBlock delay={0.1}>
+            <div className="text-center mt-10">
+              <p className="text-lg sm:text-xl font-semibold leading-relaxed" style={{ color: "var(--text-primary)" }}>
+                The creators growing fastest aren&apos;t writing more.<br />
+                <span className="animate-gradient-text">They&apos;re repurposing smarter.</span>
+              </p>
+            </div>
           </RevealBlock>
         </div>
       </section>
