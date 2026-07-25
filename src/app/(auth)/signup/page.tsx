@@ -123,7 +123,7 @@ export default function SignupPage() {
             Paste one transcript. Get 30 days of LinkedIn content written in your voice. Free forever.
           </p>
           <div className="mt-8 space-y-3">
-            {["12 LinkedIn posts per transcript", "Carousel PDFs & long articles", "AI growth coaching & analytics"].map((feat, i) => (
+                {["Up to 5 LinkedIn posts per month", "Carousel PDFs & long articles (Starter+)", "AI-powered virality scoring"].map((feat, i) => (
               <motion.div
                 key={feat}
                 className="flex items-center gap-2.5 text-xs"

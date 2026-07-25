@@ -12,7 +12,6 @@ const PLANS = [
     features: [
       "1 project per month",
       "Up to 5 generated posts",
-      "Basic carousel generator",
       "TXT export",
       "Community support",
     ],
@@ -49,7 +48,6 @@ const PLANS = [
       "Advanced analytics dashboard",
       "Multi-voice profiles",
       "API access",
-      "Team collaboration (3 seats)",
       "Dedicated support",
     ],
     cta: "Coming Soon",

@@ -129,11 +129,10 @@ export default function BetaPage() {
             <ul className="space-y-2 mb-6">
               {[
                 "Unlimited projects & transcripts",
-                "Full AI content generation (5 posts, articles, carousels)",
+                "Full AI content generation (posts & articles)",
                 "Brand voice profiling",
-                "Full carousel editor + PDF export",
                 "All export formats (PDF, Word, Excel, CSV, ZIP)",
-                "Content calendar",
+                "Content suggestions",
                 "Priority generation speed",
               ].map((feature) => (
                 <li key={feature} className="flex items-center gap-2 text-xs" style={{ color: "var(--text-muted)" }}>
@@ -190,7 +189,7 @@ export default function BetaPage() {
                 </div>
               </div>
               <div className="flex flex-wrap gap-2 mt-3">
-                {["Unlimited projects", "Full AI generation", "Brand voice", "All exports", "Carousel editor"].map((f) => (
+                {["Unlimited projects", "Full AI generation", "Brand voice", "All exports"].map((f) => (
                   <span key={f} className="text-[10px] px-2.5 py-1 rounded-full" style={{ background: "rgba(99,102,241,0.1)", color: "var(--accent)" }}>
                     {f}
                   </span>

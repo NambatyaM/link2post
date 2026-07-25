@@ -10,24 +10,21 @@ const ThemeToggle = dynamic(() => import("@/components/ThemeToggle"), { ssr: fal
 const COMPARISON = [
   { without: "Write posts manually", with: "AI writes in your voice" },
   { without: "Design carousels in Canva", with: "AI designs carousel slides" },
-  { without: "Guess your posting schedule", with: "AI builds a content calendar" },
   { without: "Research hooks and angles", with: "AI generates optimized hooks" },
   { without: "Copy-paste into docs", with: "Everything in one workspace" },
-  { without: "No performance feedback", with: "AI Growth Coach scores every post" },
+  { without: "No performance feedback", with: "AI scores your posts for virality" },
 ];
 
 const WHAT_GETS_GENERATED = [
-  { label: "12 LinkedIn Posts", tier: "free" as const },
+  { label: "5 LinkedIn Posts", tier: "free" as const },
   { label: "Carousel PDFs", tier: "starter" as const },
   { label: "2 Long Articles", tier: "free" as const },
   { label: "Poll Ideas", tier: "free" as const },
   { label: "Comment Ideas", tier: "free" as const },
-  { label: "Content Calendar", tier: "free" as const },
   { label: "Viral Hooks", tier: "free" as const },
   { label: "CTAs & Endings", tier: "free" as const },
   { label: "Image Prompts", tier: "free" as const },
   { label: "Carousel Designs", tier: "starter" as const },
-  { label: "AI Growth Report", tier: "starter" as const },
   { label: "Brand Voice Profile", tier: "starter" as const },
 ];
 
@@ -62,7 +59,7 @@ const PRICING = [
     name: "Free",
     price: "$0",
     period: "forever",
-    features: ["1 project per month", "Up to 5 generated posts", "Basic carousel generator", "TXT export"],
+    features: ["1 project per month", "Up to 5 generated posts", "TXT export"],
     cta: "Start Free",
     highlighted: false,
     link: "/signup",
@@ -72,20 +69,18 @@ const PRICING = [
     price: "$19",
     period: "/month",
     features: ["10 projects per month", "50 posts per month", "Brand voice profiling", "Full carousel editor + PDF export", "All export formats", "Priority generation"],
-    cta: "Coming Soon",
+    cta: "Join Beta Free",
     highlighted: true,
-    link: "/pricing",
-    comingSoon: true,
+    link: "/beta",
   },
   {
     name: "Pro",
     price: "$49",
     period: "/month",
-    features: ["Unlimited projects", "Unlimited posts", "Advanced analytics", "Multi-voice profiles", "API access", "Team collaboration"],
-    cta: "Coming Soon",
+    features: ["Unlimited projects", "Unlimited posts", "Advanced analytics", "Multi-voice profiles", "API access", "Dedicated support"],
+    cta: "Join Beta Free",
     highlighted: false,
-    link: "/pricing",
-    comingSoon: true,
+    link: "/beta",
   },
 ];
 
@@ -93,10 +88,8 @@ const WORKFLOW_STEPS = [
   { label: "Transcript", sub: "Paste any content", color: "#6366f1" },
   { label: "Voice Analysis", sub: "AI learns your style", color: "#8b5cf6" },
   { label: "5 LinkedIn Posts", sub: "Optimized for engagement", color: "#a855f7" },
-  { label: "Carousel Design", sub: "Professionally themed", color: "#d946ef" },
-  { label: "2 Articles", sub: "Long-form thought leadership", color: "#ec4899" },
-  { label: "Monthly Calendar", sub: "Best times mapped", color: "#f43f5e" },
-  { label: "Growth Analytics", sub: "AI-powered insights", color: "#ef4444" },
+  { label: "2 Long Articles", sub: "Thought leadership pieces", color: "#d946ef" },
+  { label: "Carousel Design", sub: "Professionally themed (Starter+)", color: "#ec4899" },
 ];
 
 const GROWTH_SCORES = [
@@ -365,7 +358,7 @@ export default function LandingPage() {
 
           <RevealBlock delay={0.1}>
             <p className="mt-7 text-base sm:text-lg max-w-2xl mx-auto leading-relaxed" style={{ color: "var(--text-secondary)" }}>
-              Link2Post analyzes your transcript, learns your voice, writes high-performing LinkedIn posts, designs professional carousel PDFs, builds a personalized content calendar, and coaches you to grow your audience &mdash; all in minutes.
+              Link2Post analyzes your transcript, learns your voice, writes high-performing LinkedIn posts, designs professional carousel PDFs, and coaches you to grow your audience &mdash; all in minutes.
             </p>
           </RevealBlock>
 
@@ -376,7 +369,7 @@ export default function LandingPage() {
               </MagneticButton>
               <MagneticButton href="#demo" className="text-sm font-medium px-8 py-4 rounded-2xl flex items-center gap-2" style={{ border: "1px solid var(--border)", color: "var(--text-secondary)", background: "var(--bg-secondary)" }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                Watch 60-second Demo
+                See How It Works
               </MagneticButton>
             </div>
           </RevealBlock>
@@ -455,7 +448,7 @@ export default function LandingPage() {
           <RevealBlock>
             <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">Why Link2Post?</h2>
             <p className="text-center text-sm mb-14 max-w-lg mx-auto" style={{ color: "var(--text-secondary)" }}>
-              Stop juggling 5 tools. Link2Post replaces your entire LinkedIn content workflow.
+              Stop juggling notes, docs, and design tools. Link2Post turns one transcript into posts, carousels, and articles &mdash; all in your voice.
             </p>
           </RevealBlock>
           <RevealBlock>
@@ -623,7 +616,7 @@ export default function LandingPage() {
             ))}
           </div>
           <p className="text-center text-xs mt-6" style={{ color: "var(--text-muted)" }}>
-            Free plan includes 1 project, 5 posts, basic carousel, and TXT export.
+            Free plan includes 1 project, 5 posts, and TXT export.
             <br />
             <a href="#pricing" className="underline transition-colors hover:text-[var(--accent)]" style={{ color: "var(--accent)" }}>Upgrade to Starter</a> for full access, or{" "}
             <Link href="/beta" className="underline transition-colors hover:text-[var(--accent)]" style={{ color: "var(--accent)" }}>join the beta</Link> to get everything free.
@@ -641,13 +634,13 @@ export default function LandingPage() {
                 <path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3" />
               </svg>
               <p className="text-sm sm:text-base leading-relaxed mb-6" style={{ color: "var(--text-secondary)" }}>
-                &ldquo;I went from spending 6 hours a week on LinkedIn content to 30 minutes. My engagement is up 340% and I&apos;ve booked 12 discovery calls from posts I didn&apos;t have time to write before.&rdquo;
+                &ldquo;Link2Post turned my podcast transcripts into a full month of LinkedIn content in under 10 minutes. The AI nailed my voice on the first try.&rdquo;
               </p>
               <div className="flex items-center justify-center gap-3">
                 <div className="w-9 h-9 rounded-full" style={{ background: "linear-gradient(135deg, var(--accent), var(--purple))", opacity: 0.8 }} />
                 <div className="text-left">
-                  <p className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>Sarah Chen</p>
-                  <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>Founder, GrowthHack</p>
+                  <p className="text-xs font-semibold" style={{ color: "var(--text-primary)" }}>Early Beta User</p>
+                  <p className="text-[10px]" style={{ color: "var(--text-muted)" }}>SaaS Founder</p>
                 </div>
               </div>
             </div>
@@ -703,7 +696,6 @@ export default function LandingPage() {
                       background: plan.highlighted ? "var(--accent)" : "transparent",
                       color: plan.highlighted ? "#fff" : "var(--text-secondary)",
                       border: plan.highlighted ? "none" : "1px solid var(--border)",
-                      opacity: plan.comingSoon ? 0.7 : 1,
                     }}
                   >
                     {plan.cta}

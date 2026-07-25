@@ -43,9 +43,9 @@ const MOCK_VOICE: VoiceData = {
 };
 
 const BILLING_PLANS = [
-  { name: "Free", price: "$0", features: ["1 project/month", "5 posts/month", "Basic carousel", "TXT export"] },
+  { name: "Free", price: "$0", features: ["1 project/month", "5 posts/month", "TXT export"] },
   { name: "Starter", price: "$19/mo", features: ["10 projects/month", "50 posts/month", "Brand voice profiling", "Full carousel editor", "All export formats", "Priority generation"] },
-  { name: "Pro", price: "$49/mo", features: ["Unlimited projects", "Unlimited posts", "Advanced analytics", "Multi-voice profiles", "API access", "Team collaboration (3 seats)", "Dedicated support"] },
+  { name: "Pro", price: "$49/mo", features: ["Unlimited projects", "Unlimited posts", "Advanced analytics", "Multi-voice profiles", "API access", "Dedicated support"] },
 ];
 
 export default function SettingsPage() {
